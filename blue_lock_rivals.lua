@@ -1,6 +1,6 @@
 -- blue_lock_rivals.lua
 
-local KeyOptions = {"f1","f2","f3","f4","f5","f6","q","e","r","t","z","x","c","v","g","f","mouse5","mouse4"}
+local KeyOptions = {"f1","f2","f3","f4","f5","f6","q","e","r","t","z","x","c","v","g","f"}
 local TP_MODES   = {"Ball to Player (pull)", "Ball Control (glue)", "Snap / Auto Steal"}
 local VIS_FONTS  = {"Tahoma", "Verdana", "ConsolasBold", "SmallestPixel"}
 
@@ -161,18 +161,6 @@ cheat.register("onSlowUpdate", refresh_goal_refs)
 
 local function now_sec()
     return utility.GetTickCount() / 1000
-end
-
-local key_prev = {}
-
-local function key_clicked(key)
-    if key == "mouse4" or key == "mouse5" then
-        return mouse.IsClicked(key)
-    end
-    local now = keyboard.IsPressed(key)
-    local edge = now and not (key_prev[key] or false)
-    key_prev[key] = now
-    return edge
 end
 
 local function front_target(hrp, off_fwd, off_up)
