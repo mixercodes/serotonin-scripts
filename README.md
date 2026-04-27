@@ -24,7 +24,13 @@ Open Serotonin → Scripting tab → load the `.lua` file. Scripts are event-dri
 
 | Script | Game | Description |
 |---|---|---|
-| `pitch_control.lua` | Blue Lock: Rivals | Ball physics manipulation (speed multiplier, gravity scale, flat path), ball teleport modes (pull, glue, auto steal), and ESP/on-screen visuals for the ball and players. |
+| `blue_lock_rivals.lua` | Blue Lock: Rivals | Ball physics manipulation (speed multiplier, gravity scale, flat path), ball teleport modes (pull, glue, auto steal), and ESP/on-screen visuals for the ball and players. |
+
+## Loadstring
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/mixercodes/serotonin-scripts/master/blue_lock_rivals.lua"))()
+```
 
 ## API reference
 

@@ -1,4 +1,4 @@
--- pitch_control.lua
+-- blue_lock_rivals.lua
 -- Ball Physics + Ball Teleport + Visuals (ESP + on-screen info)
 
 local KeyOptions = {"f1","f2","f3","f4","f5","f6","q","e","r","t","z","x","c","v","g","mouse5","mouse4"}
