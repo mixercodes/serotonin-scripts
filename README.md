@@ -29,7 +29,9 @@ Open Serotonin → Scripting tab → load the `.lua` file. Scripts are event-dri
 ## Loadstring
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/mixercodes/serotonin-scripts/master/blue_lock_rivals.lua"))()
+http.Get("https://raw.githubusercontent.com/mixercodes/serotonin-scripts/master/blue_lock_rivals.lua", {}, function(body)
+    loadstring(body)()
+end)
 ```
 
 ## API reference
