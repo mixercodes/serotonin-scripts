@@ -4,7 +4,7 @@ Personal scripts for the [Serotonin](https://serotonin-1.gitbook.io) Lua scripti
 
 ## Scripts
 
-Paste the loadstring into Serotonin's script editor to run a script.
+Paste the loadstring into Serotonin's script editor (and then execute) to run a script.
 
 ### blue_lock_rivals.lua - Blue Lock: Rivals
 
