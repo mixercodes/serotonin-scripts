@@ -1,6 +1,6 @@
 -- blue_lock_rivals.lua
 
-local KeyOptions = {"f1","f2","f3","f4","f5","f6","q","e","r","t","z","x","c","v","g","mouse5","mouse4"}
+local KeyOptions = {"f1","f2","f3","f4","f5","f6","q","e","r","t","z","x","c","v","g","f","mouse5","mouse4"}
 local TP_MODES   = {"Ball to Player (pull)", "Ball Control (glue)", "Snap / Auto Steal"}
 local VIS_FONTS  = {"Tahoma", "Verdana", "ConsolasBold", "SmallestPixel"}
 
@@ -35,7 +35,7 @@ ui.NewSliderInt(TAB, TP, "Max Retries", 1, 5)
 ui.NewCheckbox(TAB, TP, "Preserve Momentum")
 ui.NewCheckbox(TAB, TP, "Auto Goal")
 ui.newDropdown(TAB, TP, "Goal Target", {"Auto (enemy)", "Home", "Away"}, 1)
-ui.newDropdown(TAB, TP, "Auto Goal Key", KeyOptions, 15) -- default g
+ui.newDropdown(TAB, TP, "Auto Goal Key", KeyOptions, 16) -- default f
 
 -- [Visuals container]
 ui.NewContainer(TAB, VIS, "Visuals", { autosize = true, next = true })
