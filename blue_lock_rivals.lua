@@ -163,6 +163,15 @@ local function now_sec()
     return utility.GetTickCount() / 1000
 end
 
+local key_prev = {}
+
+local function key_clicked(key)
+    local now = keyboard.IsPressed(key)
+    local edge = now and not (key_prev[key] or false)
+    key_prev[key] = now
+    return edge
+end
+
 local function front_target(hrp, off_fwd, off_up)
     local ok, lv = pcall(function() return hrp.CFrame.LookVector end)
     local fwd = ok and lv or Vector3.new(0, 0, -1)
