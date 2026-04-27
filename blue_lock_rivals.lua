@@ -20,8 +20,6 @@ ui.newSliderFloat(TAB, SPD, "Activation Threshold", 0.5, 20.0, 2.0)
 ui.newSliderFloat(TAB, SPD, "Smoothing", 0.0, 1.0, 0.0)
 ui.NewCheckbox(TAB, SPD, "Enable Speed Cap")
 ui.newSliderFloat(TAB, SPD, "Max Speed Cap", 10.0, 500.0, 150.0)
-ui.NewCheckbox(TAB, SPD, "Gravity Enabled")
-ui.newSliderFloat(TAB, SPD, "Gravity Scale", -5.0, 5.0, 1.0)
 ui.NewCheckbox(TAB, SPD, "Flat Path")
 
 -- [Teleport container]
@@ -57,7 +55,6 @@ ui.NewColorpicker(TAB, VIS, "Away Fill Color", {r=255, g=80, b=80, a=40}, true)
 
 ui.setValue(TAB, SPD, "Speed Enabled", false)
 ui.setValue(TAB, SPD, "Enable Speed Cap", false)
-ui.setValue(TAB, SPD, "Gravity Enabled", false)
 ui.setValue(TAB, SPD, "Flat Path", false)
 ui.setValue(TAB, TP,  "Teleport Enabled", false)
 ui.setValue(TAB, TP,  "Preserve Momentum", true)
@@ -236,35 +233,6 @@ cheat.register("onUpdate", function()
 
     pcall(function() target.Velocity = boosted end)
     prev_vel = boosted
-end)
-
--- [Gravity logic]
--- Roblox's Workspace.Gravity is not accessible via the API, so we simulate
--- it by applying a per-tick downward velocity nudge scaled to the desired feel.
--- scale=1 mimics normal gravity, <1 floaty, >1 heavy, negative = anti-gravity.
--- Applied after speed logic so cap still applies.
-
-local GRAVITY_BASE = -196.2  -- studs/s^2 (~Roblox default 196.2), negative = down
-local TICK_DT      = 0.005   -- onUpdate fires ~5ms, used to integrate acceleration
-
-cheat.register("onUpdate", function()
-    if not ui.getValue(TAB, SPD, "Gravity Enabled") then return end
-
-    local scale = ui.getValue(TAB, SPD, "Gravity Scale") or 1.0
-    if scale == 1.0 then return end  -- no adjustment needed at default
-
-    local target = (held_ball and held_ball.Parent and held_ball)
-                or (free_ball and free_ball.Parent and free_ball)
-    if not target then return end
-
-    local ok, vel = pcall(function() return target.Velocity end)
-    if not ok or not vel then return end
-
-    -- delta = (scale - 1) * base_gravity * dt
-    -- scale=2 doubles downward pull, scale=0 cancels it, scale=-1 flips it
-    local delta_y = (scale - 1.0) * GRAVITY_BASE * TICK_DT
-    local adjusted = Vector3.new(vel.X, vel.Y + delta_y, vel.Z)
-    pcall(function() target.Velocity = adjusted end)
 end)
 
 -- [Flat path logic]
