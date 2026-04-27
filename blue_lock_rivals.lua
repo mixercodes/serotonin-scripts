@@ -10,7 +10,7 @@ local SPD = "ballt_spd"
 local TP  = "ballt_tp"
 local VIS = "ballt_vis"
 
-ui.newTab(TAB, "Pitch Control")
+ui.newTab(TAB, "Blue Lock: Rivals")
 
 -- [Ball Physics container]
 ui.NewContainer(TAB, SPD, "Ball Physics", { autosize = true })
@@ -490,7 +490,7 @@ cheat.register("onPaint", function()
         local gg_label = auto_goal_active
             and ("ON -> " .. (gg_target_names[gg_target_idx + 1] or "?"))
             or "OFF"
-        draw.TextOutlined("Pitch Control", x, y,      COLOR_YELLOW, font, 255)
+        draw.TextOutlined("BL:R", x, y, COLOR_YELLOW, font, 255)
         draw.TextOutlined("Speed:  " .. tostring(info_speed) .. " (" .. ball_status .. ")", x, y + 15, COLOR_WHITE, font, 255)
         draw.TextOutlined("Dist:   " .. info_dist,      x, y + 30, COLOR_WHITE, font, 255)
         draw.TextOutlined("TP:     " .. info_tp_status,  x, y + 45, COLOR_WHITE, font, 255)
