@@ -303,11 +303,38 @@ cheat.register("onUpdate", function()
         return
     end
 
-    local ball = world_ball or (free_ball and free_ball.Parent and free_ball)
-    local hrp  = local_char and local_char:FindFirstChild("HumanoidRootPart")
+    local hrp = local_char and local_char:FindFirstChild("HumanoidRootPart")
+    if not hrp then info_tp_status = "Char not found"; return end
 
-    if not ball then info_tp_status = "Ball not found"; return end
-    if not hrp  then info_tp_status = "Char not found"; return end
+    -- returning phase: spam-write origin to beat inconsistent anticheat, no ball needed
+    if ptb_phase == "returning" then
+        local target_pos = ptb_return_pos
+        for _ = 1, 25 do pcall(function() hrp.Position = target_pos end) end
+        local ok, dist = pcall(function() return (hrp.Position - target_pos).Magnitude end)
+        if (ok and dist < 8) or (now_sec() - ptb_dwell_start > 0.5) then
+            info_tp_status = "Returned"
+            ptb_phase      = "idle"
+            ptb_return_pos = nil
+        else
+            info_tp_status = "Returning..."
+        end
+        return
+    end
+
+    local ball = world_ball or (free_ball and free_ball.Parent and free_ball)
+
+    if not ball then
+        -- ball vanished mid-phase (teleported to center etc.) - abort back to origin
+        if (ptb_phase == "at_ball" or ptb_phase == "stealing") and ptb_return_pos then
+            if ptb_phase == "stealing" then keyboard.Release("e") end
+            ptb_phase       = "returning"
+            ptb_dwell_start = now_sec()
+            info_tp_status  = "Ball lost - returning"
+        else
+            info_tp_status = "Ball not found"
+        end
+        return
+    end
 
     local key_idx  = ui.getValue(TAB, TP, "Teleport Key") or 11
     local key      = KeyOptions[key_idx + 1] or "z"
@@ -405,15 +432,21 @@ cheat.register("onUpdate", function()
             local elapsed = now_sec() - ptb_dwell_start
             if elapsed >= steal_dwell then
                 keyboard.Release("e")
-                pcall(function() hrp.Position = ptb_return_pos end)
-                ptb_phase      = "idle"
-                ptb_return_pos = nil
-                info_tp_status = "Steal done"
+                ptb_phase       = "returning"
+                ptb_dwell_start = now_sec()
+                info_tp_status  = "Returning..."
             else
                 info_tp_status = string.format("Stealing %.1fs", steal_dwell - elapsed)
             end
 
         elseif ptb_phase == "at_ball" then
+            -- ownership confirmed: Football parented to local character
+            if local_char and local_char:FindFirstChild("Football") then
+                ptb_phase       = "returning"
+                ptb_dwell_start = now_sec()
+                info_tp_status  = "Got ball - returning"
+                return
+            end
             local dir = ball.Position - hrp.Position
             local tgt = ball.Position + Vector3.new(0, off_up, 0)
             if dir.Magnitude > 0.1 then
@@ -425,12 +458,11 @@ cheat.register("onUpdate", function()
             pcall(function() hrp.Position = tgt end)
             local elapsed = now_sec() - ptb_dwell_start
             if elapsed >= dwell then
-                pcall(function() hrp.Position = ptb_return_pos end)
-                info_tp_status = "Returned"
-                ptb_phase      = "idle"
-                ptb_return_pos = nil
+                ptb_phase       = "returning"
+                ptb_dwell_start = now_sec()
+                info_tp_status  = "Returning..."
             else
-                info_tp_status = string.format("Returning %.1fs", dwell - elapsed)
+                info_tp_status = string.format("At ball %.1fs", dwell - elapsed)
             end
         end
     end
