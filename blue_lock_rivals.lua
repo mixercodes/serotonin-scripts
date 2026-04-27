@@ -19,7 +19,7 @@ ui.newSliderFloat(TAB, SPD, "Activation Threshold", 0.5, 20.0, 2.0)
 ui.newSliderFloat(TAB, SPD, "Smoothing", 0.0, 1.0, 0.0)
 ui.NewCheckbox(TAB, SPD, "Enable Speed Cap")
 ui.newSliderFloat(TAB, SPD, "Max Speed Cap", 10.0, 500.0, 150.0)
-ui.NewCheckbox(TAB, SPD, "Flat Path")
+ui.newSliderFloat(TAB, SPD, "Arc", 0.0, 1.0)
 
 -- [Teleport container]
 ui.NewContainer(TAB, TP, "Ball Teleport", { autosize = true, next = true })
@@ -56,7 +56,7 @@ ui.NewColorpicker(TAB, VIS, "Away Fill Color", {r=255, g=80, b=80, a=40}, true)
 
 ui.setValue(TAB, SPD, "Speed Enabled", false)
 ui.setValue(TAB, SPD, "Enable Speed Cap", false)
-ui.setValue(TAB, SPD, "Flat Path", false)
+ui.setValue(TAB, SPD, "Arc", 1.0)
 ui.setValue(TAB, TP,  "Teleport Enabled", false)
 ui.setValue(TAB, TP,  "Retry Snap", true)
 ui.setValue(TAB, TP,  "Max Retries", 2)
@@ -234,18 +234,15 @@ cheat.register("onUpdate", function()
     prev_vel = boosted
 end)
 
--- [Flat path logic]
--- Cancels gravity accumulation on the ball by zeroing vel.Y each tick while the ball
--- has meaningful horizontal movement, keeping it at a fixed height instead of arcing.
--- Deactivates when horizontal speed drops below threshold so the ball can settle normally.
+-- [Arc logic]
+-- 1.0 = natural physics, 0.0 = completely flat. Scales vel.Y by the arc factor each tick.
+-- At 0, also locks Y position since zeroing velocity alone doesn't prevent gravity drift.
 
-local flat_lock_y = nil  -- latched on the first frame of engagement
+local flat_lock_y = nil
 
 cheat.register("onUpdate", function()
-    if not ui.getValue(TAB, SPD, "Flat Path") then
-        flat_lock_y = nil
-        return
-    end
+    local arc = ui.getValue(TAB, SPD, "Arc") or 1.0
+    if arc >= 1.0 then flat_lock_y = nil; return end
 
     local target = (held_ball and held_ball.Parent and held_ball)
                 or (free_ball and free_ball.Parent and free_ball)
@@ -256,26 +253,26 @@ cheat.register("onUpdate", function()
 
     local horiz = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
     local threshold = ui.getValue(TAB, SPD, "Activation Threshold") or 2.0
-    if horiz < threshold then
-        flat_lock_y = nil
-        return
-    end
+    if horiz < threshold then flat_lock_y = nil; return end
 
-    if not flat_lock_y then
-        local ok2, pos = pcall(function() return target.Position end)
-        flat_lock_y = ok2 and pos and pos.Y or nil
-        if not flat_lock_y then return end
-    end
+    pcall(function() target.Velocity = Vector3.new(vel.X, vel.Y * arc, vel.Z) end)
 
-    pcall(function() target.Velocity = Vector3.new(vel.X, 0, vel.Z) end)
-
-    -- correct position drift if gravity already moved it
-    pcall(function()
-        local pos = target.Position
-        if math.abs(pos.Y - flat_lock_y) > 0.5 then
-            target.Position = Vector3.new(pos.X, flat_lock_y, pos.Z)
+    if arc <= 0.0 then
+        if not flat_lock_y then
+            local ok2, pos = pcall(function() return target.Position end)
+            flat_lock_y = ok2 and pos and pos.Y or nil
         end
-    end)
+        if flat_lock_y then
+            pcall(function()
+                local pos = target.Position
+                if math.abs(pos.Y - flat_lock_y) > 0.5 then
+                    target.Position = Vector3.new(pos.X, flat_lock_y, pos.Z)
+                end
+            end)
+        end
+    else
+        flat_lock_y = nil
+    end
 end)
 
 -- [Teleport / Ball Control logic]
@@ -463,16 +460,6 @@ cheat.register("onUpdate", function()
             end
 
         elseif ptb_phase == "at_ball" then
-            local dir = ball.Position - hrp.Position
-            local tgt = ball.Position + Vector3.new(0, off_up, 0)
-            if dir.Magnitude > 0.1 then
-                local flat = Vector3.new(dir.X, 0, dir.Z)
-                if flat.Magnitude > 0.1 then
-                    tgt = ball.Position - flat.Unit * off_fwd + Vector3.new(0, off_up, 0)
-                end
-            end
-            pcall(function() hrp.Position = tgt end)
-
             if local_char and local_char:FindFirstChild("Football") then
                 ptb_phase       = "confirming"
                 ptb_dwell_start = now_sec()
@@ -485,6 +472,15 @@ cheat.register("onUpdate", function()
                 local retry_on = ui.getValue(TAB, TP, "Retry Snap")
                 local max_r    = ui.getValue(TAB, TP, "Max Retries") or 2
                 if retry_on and ptb_retries < max_r then
+                    local dir = ball.Position - hrp.Position
+                    local tgt = ball.Position + Vector3.new(0, off_up, 0)
+                    if dir.Magnitude > 0.1 then
+                        local flat = Vector3.new(dir.X, 0, dir.Z)
+                        if flat.Magnitude > 0.1 then
+                            tgt = ball.Position - flat.Unit * off_fwd + Vector3.new(0, off_up, 0)
+                        end
+                    end
+                    pcall(function() hrp.Position = tgt end)
                     ptb_retries     = ptb_retries + 1
                     ptb_dwell_start = now_sec()
                     info_tp_status  = string.format("Retry %d/%d", ptb_retries, max_r)
