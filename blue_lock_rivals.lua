@@ -1,5 +1,4 @@
 -- blue_lock_rivals.lua
--- Ball Physics + Ball Teleport + Visuals (ESP + on-screen info)
 
 local KeyOptions = {"f1","f2","f3","f4","f5","f6","q","e","r","t","z","x","c","v","g","mouse5","mouse4"}
 local TP_MODES   = {"Ball to Player (pull)", "Ball Control (glue)", "Snap / Auto Steal"}
@@ -77,15 +76,13 @@ local free_ball    = nil
 local held_ball    = nil
 local world_ball   = nil
 local holder_char  = nil
-local local_char   = nil   -- cached, refreshed on slowUpdate
+local local_char   = nil
 local prev_vel     = Vector3.new(0, 0, 0)
 local ball_status  = "---"
 
--- static colors (created once, not per-frame)
 local COLOR_WHITE  = Color3.new(1, 1, 1)
 local COLOR_YELLOW = Color3.fromRGB(255, 220, 0)
 
--- reusable screen-point buffer (avoids per-frame table allocation)
 local _screen_buf = {}
 
 local function refresh_ball_refs()
@@ -189,8 +186,6 @@ local function picker_to_color3(t)
     return Color3.fromRGB(t.r or 255, t.g or 255, t.b or 255)
 end
 
--- [Live info state]
-
 local info_speed     = 0
 local info_dist      = "--"
 local info_tp_status = "Teleport disabled"
@@ -240,13 +235,11 @@ cheat.register("onUpdate", function()
 end)
 
 -- [Flat path logic]
--- Cancels Roblox gravity accumulation on the ball by zeroing vel.Y each tick
--- while the ball has meaningful horizontal movement. This keeps it at the height
--- it was at when kicked, travelling in a straight line instead of an arc.
--- Deactivates automatically when horizontal speed drops below threshold so the
--- ball can settle/land normally once it reaches its target.
+-- Cancels gravity accumulation on the ball by zeroing vel.Y each tick while the ball
+-- has meaningful horizontal movement, keeping it at a fixed height instead of arcing.
+-- Deactivates when horizontal speed drops below threshold so the ball can settle normally.
 
-local flat_lock_y = nil  -- locked Y position; set when the ball gains speed
+local flat_lock_y = nil  -- latched on the first frame of engagement
 
 cheat.register("onUpdate", function()
     if not ui.getValue(TAB, SPD, "Flat Path") then
@@ -262,25 +255,21 @@ cheat.register("onUpdate", function()
     if not ok or not vel then return end
 
     local horiz = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
-
-    -- only engage while the ball is genuinely moving horizontally
     local threshold = ui.getValue(TAB, SPD, "Activation Threshold") or 2.0
     if horiz < threshold then
         flat_lock_y = nil
         return
     end
 
-    -- latch the Y position on the first frame we engage
     if not flat_lock_y then
         local ok2, pos = pcall(function() return target.Position end)
         flat_lock_y = ok2 and pos and pos.Y or nil
         if not flat_lock_y then return end
     end
 
-    -- rewrite velocity with Y = 0, keeping horizontal motion untouched
     pcall(function() target.Velocity = Vector3.new(vel.X, 0, vel.Z) end)
 
-    -- also correct position drift (gravity may have moved it a stud already)
+    -- correct position drift if gravity already moved it
     pcall(function()
         local pos = target.Position
         if math.abs(pos.Y - flat_lock_y) > 0.5 then
@@ -303,6 +292,7 @@ cheat.register("onUpdate", function()
         if ptb_phase == "stealing" then keyboard.Release("e") end
         glue_active    = false
         ptb_phase      = "idle"
+        ptb_retries    = 0
         ptb_return_pos = nil
         info_tp_status = "Teleport disabled"
         return
@@ -311,7 +301,7 @@ cheat.register("onUpdate", function()
     local hrp = local_char and local_char:FindFirstChild("HumanoidRootPart")
     if not hrp then info_tp_status = "Char not found"; return end
 
-    -- returning phase: spam-write origin to beat inconsistent anticheat, no ball needed
+    -- Spam-write origin each frame to beat the inconsistent anticheat teleport. No ball needed.
     if ptb_phase == "returning" then
         local target_pos = ptb_return_pos
         for _ = 1, 25 do pcall(function() hrp.Position = target_pos end) end
@@ -326,12 +316,42 @@ cheat.register("onUpdate", function()
         return
     end
 
+    -- The server can snatch the ball back within ~200-300ms, so a single-frame ownership
+    -- check is unreliable. Watch Football in local_char for a stable 400ms window first.
+    if ptb_phase == "confirming" then
+        local retry_on = ui.getValue(TAB, TP, "Retry Snap")
+        local max_r    = ui.getValue(TAB, TP, "Max Retries") or 2
+        if local_char and local_char:FindFirstChild("Football") then
+            if now_sec() - ptb_dwell_start >= 0.4 then
+                ptb_retries     = 0
+                ptb_phase       = "returning"
+                ptb_dwell_start = now_sec()
+                info_tp_status  = "Got ball - returning"
+            else
+                info_tp_status = "Confirming..."
+            end
+        else
+            if retry_on and ptb_retries < max_r then
+                ptb_retries     = ptb_retries + 1
+                ptb_phase       = "at_ball"
+                ptb_dwell_start = now_sec()
+                info_tp_status  = string.format("Lost - retry %d/%d", ptb_retries, max_r)
+            else
+                ptb_retries     = 0
+                ptb_phase       = "returning"
+                ptb_dwell_start = now_sec()
+                info_tp_status  = "Returning..."
+            end
+        end
+        return
+    end
+
     local ball = world_ball or (free_ball and free_ball.Parent and free_ball)
 
     if not ball then
-        -- ball vanished mid-phase (teleported to center etc.) - abort back to origin
         if (ptb_phase == "at_ball" or ptb_phase == "stealing") and ptb_return_pos then
             if ptb_phase == "stealing" then keyboard.Release("e") end
+            ptb_retries     = 0
             ptb_phase       = "returning"
             ptb_dwell_start = now_sec()
             info_tp_status  = "Ball lost - returning"
@@ -378,7 +398,6 @@ cheat.register("onUpdate", function()
         end
 
     else
-        -- find enemy holder for steal branch
         local is_local_holding = holder_char and local_char and holder_char.Name == local_char.Name
         local enemy_hrp = nil
         if holder_char and holder_char.Parent and not is_local_holding then
@@ -389,7 +408,6 @@ cheat.register("onUpdate", function()
             if clicked then
                 ptb_return_pos = hrp.Position
                 if enemy_hrp then
-                    -- steal: teleport onto holder, dwell pressing e
                     local ok, err = pcall(function() hrp.Position = enemy_hrp.Position end)
                     if ok then
                         ptb_phase       = "stealing"
@@ -400,7 +418,6 @@ cheat.register("onUpdate", function()
                         ptb_return_pos = nil
                     end
                 else
-                    -- no holder: snap to ball
                     local dir = ball.Position - hrp.Position
                     local tgt = ball.Position + Vector3.new(0, off_up, 0)
                     if dir.Magnitude > 0.1 then
@@ -446,14 +463,6 @@ cheat.register("onUpdate", function()
             end
 
         elseif ptb_phase == "at_ball" then
-            -- ownership confirmed: Football parented to local character
-            if local_char and local_char:FindFirstChild("Football") then
-                ptb_retries     = 0
-                ptb_phase       = "returning"
-                ptb_dwell_start = now_sec()
-                info_tp_status  = "Got ball - returning"
-                return
-            end
             local dir = ball.Position - hrp.Position
             local tgt = ball.Position + Vector3.new(0, off_up, 0)
             if dir.Magnitude > 0.1 then
@@ -463,22 +472,22 @@ cheat.register("onUpdate", function()
                 end
             end
             pcall(function() hrp.Position = tgt end)
+
+            if local_char and local_char:FindFirstChild("Football") then
+                ptb_phase       = "confirming"
+                ptb_dwell_start = now_sec()
+                info_tp_status  = "Confirming..."
+                return
+            end
+
             local elapsed = now_sec() - ptb_dwell_start
             if elapsed >= dwell then
                 local retry_on = ui.getValue(TAB, TP, "Retry Snap")
                 local max_r    = ui.getValue(TAB, TP, "Max Retries") or 2
                 if retry_on and ptb_retries < max_r then
-                    local ok = pcall(function() hrp.Position = tgt end)
-                    if ok then
-                        ptb_retries     = ptb_retries + 1
-                        ptb_dwell_start = now_sec()
-                        info_tp_status  = string.format("Retry %d/%d", ptb_retries, max_r)
-                    else
-                        ptb_retries     = 0
-                        ptb_phase       = "returning"
-                        ptb_dwell_start = now_sec()
-                        info_tp_status  = "Returning..."
-                    end
+                    ptb_retries     = ptb_retries + 1
+                    ptb_dwell_start = now_sec()
+                    info_tp_status  = string.format("Retry %d/%d", ptb_retries, max_r)
                 else
                     ptb_retries     = 0
                     ptb_phase       = "returning"
@@ -526,7 +535,6 @@ end
 cheat.register("onPaint", function()
     local font = VIS_FONTS[(ui.getValue(TAB, VIS, "Font") or 0) + 1] or "Tahoma"
 
-    -- ball speed (read once for info display)
     local display = world_ball
                  or (held_ball and held_ball.Parent and held_ball)
                  or (free_ball and free_ball.Parent and free_ball)
@@ -537,7 +545,6 @@ cheat.register("onPaint", function()
         info_speed = 0
     end
 
-    -- Info Display
     if ui.getValue(TAB, VIS, "Info Display") then
         local _sw, sh = cheat.GetWindowSize()
         local x, y = 10, sh - 85
@@ -548,12 +555,11 @@ cheat.register("onPaint", function()
             or "OFF"
         draw.TextOutlined("BL:R", x, y, COLOR_YELLOW, font, 255)
         draw.TextOutlined("Speed:  " .. tostring(info_speed) .. " (" .. ball_status .. ")", x, y + 15, COLOR_WHITE, font, 255)
-        draw.TextOutlined("Dist:   " .. info_dist,      x, y + 30, COLOR_WHITE, font, 255)
-        draw.TextOutlined("TP:     " .. info_tp_status,  x, y + 45, COLOR_WHITE, font, 255)
-        draw.TextOutlined("Goal:   " .. gg_label,         x, y + 60, COLOR_WHITE, font, 255)
+        draw.TextOutlined("Dist:   " .. info_dist,     x, y + 30, COLOR_WHITE, font, 255)
+        draw.TextOutlined("TP:     " .. info_tp_status, x, y + 45, COLOR_WHITE, font, 255)
+        draw.TextOutlined("Goal:   " .. gg_label,        x, y + 60, COLOR_WHITE, font, 255)
     end
 
-    -- Ball ESP / Fill
     local ball_esp_on  = ui.getValue(TAB, VIS, "Ball ESP")
     local ball_fill_on = ui.getValue(TAB, VIS, "Ball Fill")
     if ball_esp_on or ball_fill_on then
@@ -597,7 +603,6 @@ cheat.register("onPaint", function()
         end
     end
 
-    -- Goal ESP / Fill
     local goal_esp_on  = ui.getValue(TAB, VIS, "Goal ESP")
     local goal_fill_on = ui.getValue(TAB, VIS, "Goal Fill")
     if goal_esp_on or goal_fill_on then
@@ -607,8 +612,8 @@ cheat.register("onPaint", function()
         local away_fill_t   = ui.getValue(TAB, VIS, "Away Fill Color") or {}
         local home_fill_col = picker_to_color3(home_fill_t)
         local away_fill_col = picker_to_color3(away_fill_t)
+        local goal_text_on  = ui.getValue(TAB, VIS, "Goal ESP Text")
 
-        local goal_text_on = ui.getValue(TAB, VIS, "Goal ESP Text")
         for _, entry in ipairs(goal_boxes) do
             local gb = entry.part
             if gb and gb.Parent then
@@ -659,7 +664,8 @@ cheat.register("onUpdate", function()
     local target_idx = ui.getValue(TAB, TP, "Goal Target") or 0
     local target_name
     if target_idx == 0 then
-        local ok, team = pcall(function() return game.LocalPlayer.Team end)
+        local lp = game.LocalPlayer
+        local ok, team = lp and pcall(function() return lp.Team end) or false, nil
         local my_team = ok and tostring(team) or ""
         target_name = (my_team == "Home") and "Home" or "Away"
     else
@@ -679,22 +685,20 @@ cheat.register("onUpdate", function()
     end)
 end)
 
-
-
 -- [Cleanup]
 
 cheat.register("shutdown", function()
-    free_ball      = nil
-    held_ball      = nil
-    world_ball     = nil
-    holder_char    = nil
-    local_char     = nil
-    goal_boxes     = {}
+    free_ball        = nil
+    held_ball        = nil
+    world_ball       = nil
+    holder_char      = nil
+    local_char       = nil
+    goal_boxes       = {}
     glue_active      = false
     auto_goal_active = false
     ptb_phase        = "idle"
     ptb_retries      = 0
+    ptb_return_pos   = nil
+    flat_lock_y      = nil
     keyboard.Release("e")
-    ptb_return_pos = nil
-    flat_lock_y    = nil
 end)
