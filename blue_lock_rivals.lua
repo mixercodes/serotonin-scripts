@@ -10,7 +10,7 @@ local SPD = "ballt_spd"
 local TP  = "ballt_tp"
 local VIS = "ballt_vis"
 
-ui.newTab(TAB, "Blue Lock: Rivals")
+ui.newTab(TAB, "BL:R")
 
 -- [Ball Physics container]
 ui.NewContainer(TAB, SPD, "Ball Physics", { autosize = true })
