@@ -31,6 +31,8 @@ ui.newSliderFloat(TAB, TP, "Offset Forward", 0.0, 10.0, 3.0)
 ui.newSliderFloat(TAB, TP, "Offset Up", 0.0, 10.0, 2.0)
 ui.newSliderFloat(TAB, TP, "Dwell Time (sec)", 0.0, 5.0, 0.10)
 ui.newSliderFloat(TAB, TP, "Steal Dwell (sec)", 0.3, 3.0, 0.6)
+ui.NewCheckbox(TAB, TP, "Retry Snap")
+ui.NewSliderInt(TAB, TP, "Max Retries", 1, 5)
 ui.NewCheckbox(TAB, TP, "Preserve Momentum")
 ui.NewCheckbox(TAB, TP, "Auto Goal")
 ui.newDropdown(TAB, TP, "Goal Target", {"Auto (enemy)", "Home", "Away"}, 1)
@@ -57,6 +59,8 @@ ui.setValue(TAB, SPD, "Speed Enabled", false)
 ui.setValue(TAB, SPD, "Enable Speed Cap", false)
 ui.setValue(TAB, SPD, "Flat Path", false)
 ui.setValue(TAB, TP,  "Teleport Enabled", false)
+ui.setValue(TAB, TP,  "Retry Snap", true)
+ui.setValue(TAB, TP,  "Max Retries", 2)
 ui.setValue(TAB, TP,  "Preserve Momentum", true)
 ui.setValue(TAB, TP,  "Auto Goal", false)
 ui.setValue(TAB, VIS, "Info Display", true)
@@ -292,6 +296,7 @@ local auto_goal_active = false
 local ptb_phase        = "idle"
 local ptb_return_pos   = nil
 local ptb_dwell_start  = 0
+local ptb_retries      = 0
 
 cheat.register("onUpdate", function()
     if not ui.getValue(TAB, TP, "Teleport Enabled") then
@@ -408,6 +413,7 @@ cheat.register("onUpdate", function()
                     if ok then
                         ptb_phase       = "at_ball"
                         ptb_dwell_start = now_sec()
+                        ptb_retries     = 0
                         info_tp_status  = "At ball..."
                     else
                         info_tp_status = "TP fail: " .. tostring(err)
@@ -442,6 +448,7 @@ cheat.register("onUpdate", function()
         elseif ptb_phase == "at_ball" then
             -- ownership confirmed: Football parented to local character
             if local_char and local_char:FindFirstChild("Football") then
+                ptb_retries     = 0
                 ptb_phase       = "returning"
                 ptb_dwell_start = now_sec()
                 info_tp_status  = "Got ball - returning"
@@ -458,9 +465,26 @@ cheat.register("onUpdate", function()
             pcall(function() hrp.Position = tgt end)
             local elapsed = now_sec() - ptb_dwell_start
             if elapsed >= dwell then
-                ptb_phase       = "returning"
-                ptb_dwell_start = now_sec()
-                info_tp_status  = "Returning..."
+                local retry_on = ui.getValue(TAB, TP, "Retry Snap")
+                local max_r    = ui.getValue(TAB, TP, "Max Retries") or 2
+                if retry_on and ptb_retries < max_r then
+                    local ok = pcall(function() hrp.Position = tgt end)
+                    if ok then
+                        ptb_retries     = ptb_retries + 1
+                        ptb_dwell_start = now_sec()
+                        info_tp_status  = string.format("Retry %d/%d", ptb_retries, max_r)
+                    else
+                        ptb_retries     = 0
+                        ptb_phase       = "returning"
+                        ptb_dwell_start = now_sec()
+                        info_tp_status  = "Returning..."
+                    end
+                else
+                    ptb_retries     = 0
+                    ptb_phase       = "returning"
+                    ptb_dwell_start = now_sec()
+                    info_tp_status  = "Returning..."
+                end
             else
                 info_tp_status = string.format("At ball %.1fs", dwell - elapsed)
             end
@@ -669,6 +693,7 @@ cheat.register("shutdown", function()
     glue_active      = false
     auto_goal_active = false
     ptb_phase        = "idle"
+    ptb_retries      = 0
     keyboard.Release("e")
     ptb_return_pos = nil
     flat_lock_y    = nil
