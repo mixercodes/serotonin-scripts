@@ -59,7 +59,7 @@ ui.setValue(TAB, SPD, "Enable Speed Cap", false)
 ui.setValue(TAB, SPD, "Arc", 1.0)
 ui.setValue(TAB, TP,  "Teleport Enabled", false)
 ui.setValue(TAB, TP,  "Retry Snap", true)
-ui.setValue(TAB, TP,  "Max Retries", 5)
+ui.setValue(TAB, TP,  "Max Retries", 3)
 ui.setValue(TAB, TP,  "Preserve Momentum", true)
 ui.setValue(TAB, TP,  "Auto Goal", false)
 ui.setValue(TAB, VIS, "Info Display", true)
@@ -635,7 +635,7 @@ end)
 
 -- [Auto Goal logic]
 
--- 0=Auto, 1=Home, 2=Away (matches dropdown order)
+-- 1=Auto, 2=Home, 3=Away (matches dropdown order)
 local GOAL_TARGETS = {"Auto (enemy)", "Home", "Away"}
 
 cheat.register("onUpdate", function()
