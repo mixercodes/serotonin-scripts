@@ -22,10 +22,11 @@ Open Serotonin → Scripting tab → load the `.lua` file. Scripts are event-dri
 
 ## Scripts
 
-| Script | Description |
-|---|---|
-| `pitch_control.lua` | ... |
+| Script | Game | Description |
+|---|---|---|
+| `pitch_control.lua` | Blue Lock: Rivals | Ball physics manipulation (speed multiplier, gravity scale, flat path), ball teleport modes (pull, glue, auto steal), and ESP/on-screen visuals for the ball and players. |
 
 ## API reference
 
-Community-audited docs: https://deftsolutions-dev.github.io/serotonin-api-docs/
+- **Community docs**: https://deftsolutions-dev.github.io/serotonin-api-docs/ — hand-audited against a live runtime, covers all 17 libraries with correct signatures and crash flags. Prefer this over the official gitbook.
+- **Official gitbook**: https://serotonin-1.gitbook.io — use as a fallback only, known to have drifted.
