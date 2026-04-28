@@ -824,10 +824,10 @@ cheat.register("onPaint", function()
             and ("On -> " .. (gg_target_names[gg_target_idx + 1] or "?"))
             or "Off"
         local spd_label = ui.getValue(TAB, SPD, "Speed Enabled")
-            and (speed_active and "On" or "Off (key)")
+            and (speed_active and "On" or "Ready")
             or "Off"
         local arc_label = ui.getValue(TAB, SPD, "Ball Arc")
-            and (arc_active and "On" or "Off (key)")
+            and (arc_active and "On" or "Ready")
             or "Off"
         draw.TextOutlined("BL:R", x, y, COLOR_BLUE, font, 255)
         draw.TextOutlined("Speed:  " .. tostring(info_speed) .. " (" .. ball_status .. ")", x, y + 15, COLOR_WHITE, font, 255)
