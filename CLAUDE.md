@@ -15,6 +15,8 @@ Two MCP servers extend Claude's capabilities beyond file editing:
 - `serotonin-docs` - serves the community-audited Serotonin API reference (17 libraries, 130 functions, crash flags). Claude queries this before writing any API call instead of guessing.
 - `serotonin-bridge` - connects to the live running Roblox game via `bridge.lua`. Lets Claude inspect the real instance tree, run Lua, read player positions, and verify game state while writing scripts.
 
+Both MCP servers are from [DeftSolutions-dev/mcp-serotonin](https://github.com/DeftSolutions-dev/mcp-serotonin) - setup instructions are on that repo.
+
 MCP config lives in `.mcp.json` at the repo root (or your Claude Code settings). To use the bridge, load `bridge.lua` in Serotonin before starting a Claude session.
 
 **3. Type stubs (`.globals/environment.d.luau`)**

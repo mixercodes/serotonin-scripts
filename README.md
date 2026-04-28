@@ -62,6 +62,15 @@ In Serotonin's Scripting tab, paste the loadstring for the script you want and e
 CLAUDE.md          - AI assistant instructions (see below)
 ```
 
+## AI (Claude Code)
+
+This repo uses [Claude Code](https://claude.ai/code) with two MCP servers from [DeftSolutions-dev/mcp-serotonin](https://github.com/DeftSolutions-dev/mcp-serotonin):
+
+- `serotonin-docs` - live API reference, queried by Claude before writing any Serotonin call
+- `serotonin-bridge` - connects Claude to the running game via `bridge.lua` for live instance inspection and Lua eval
+
+Setup instructions are on the [mcp-serotonin](https://github.com/DeftSolutions-dev/mcp-serotonin) repo. Once configured, run `claude` from the repo root - `CLAUDE.md` is picked up automatically.
+
 ## API reference
 
 - **Community docs (preferred)**: https://deftsolutions-dev.github.io/serotonin-api-docs/ - hand-audited against a live runtime, covers all 17 libraries with correct signatures and crash flags.
