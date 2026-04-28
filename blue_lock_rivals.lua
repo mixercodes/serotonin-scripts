@@ -342,12 +342,15 @@ local ptb_phase          = "idle"
 local ptb_return_pos     = nil
 local ptb_dwell_start    = 0
 local ptb_retries        = 0
+local ptb_start_time     = 0
 local tween_to_phase     = "at_ball"
 local tween_start_pos    = nil
 local tween_start_time   = 0
 local ret_tween_start      = nil
 local ret_tween_start_time = 0
 local ret_use_tween        = false
+
+local PTB_TIMEOUT = 3.0
 
 cheat.register("onUpdate", function()
     if not ui.getValue(TAB, TP, "Teleport Enabled") then
@@ -467,6 +470,7 @@ cheat.register("onUpdate", function()
                     info_tp_status = "Holding ball"
                 else
                     ptb_return_pos = hrp.Position
+                    ptb_start_time = now_sec()
                     if enemy_hrp then
                         if use_tween then
                             tween_start_pos  = hrp.Position
@@ -518,7 +522,21 @@ cheat.register("onUpdate", function()
                 end
             end
 
-        elseif ptb_phase == "tweening" then
+        elseif ptb_phase == "tweening" or ptb_phase == "at_ball" or ptb_phase == "stealing" then
+            if now_sec() - ptb_start_time > PTB_TIMEOUT then
+                if ptb_phase == "stealing" then keyboard.Release("e") end
+                ptb_retries          = 0
+                tween_start_pos      = nil
+                ret_use_tween        = use_tween
+                ret_tween_start      = hrp.Position
+                ret_tween_start_time = now_sec()
+                ptb_phase            = "returning"
+                ptb_dwell_start      = now_sec()
+                info_tp_status       = "Timeout - returning"
+                return
+            end
+        end
+        if ptb_phase == "tweening" then
             local elapsed  = now_sec() - tween_start_time
             local tw_dur   = ui.getValue(TAB, TP, "Tween Time (sec)")
             local progress = math.min(elapsed / tw_dur, 1.0)
