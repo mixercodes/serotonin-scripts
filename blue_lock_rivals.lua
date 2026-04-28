@@ -9,7 +9,7 @@ local SPD = "ballt_spd"
 local TP  = "ballt_tp"
 local VIS = "ballt_vis"
 
-local OFF_UP = 2
+local OFF_UP = 2.5
 
 ui.newTab(TAB, "BL:R")
 
@@ -29,8 +29,8 @@ ui.NewCheckbox(TAB, TP, "Teleport Enabled")
 ui.newHotkey(TAB, TP, "Teleport Key", true)
 ui.newDropdown(TAB, TP, "TP Mode", TP_MODES)
 ui.newDropdown(TAB, TP, "Travel Mode", TRAVEL_MODES)
-ui.newSliderFloat(TAB, TP, "Tween Time (sec)", 0.05, 5.0)
-ui.newSliderFloat(TAB, TP, "Return Time (sec)", 0.05, 5.0)
+ui.newSliderFloat(TAB, TP, "Tween Time (sec)", 0.05, 1.0)
+ui.newSliderFloat(TAB, TP, "Return Time (sec)", 0.05, 1.0)
 ui.newSliderFloat(TAB, TP, "Dwell Time (sec)", 0.0, 5.0)
 ui.newSliderFloat(TAB, TP, "Steal Dwell (sec)", 0.1, 5.0)
 ui.NewCheckbox(TAB, TP, "Retry on Miss")
@@ -240,7 +240,7 @@ cheat.register("onUpdate", function()
     ui.SetVisibility(TAB, TP, "Travel Mode",       tp_on and is_ptb)
     ui.SetVisibility(TAB, TP, "Tween Time (sec)",  tp_on and is_tween)
     ui.SetVisibility(TAB, TP, "Return Time (sec)", tp_on and is_tween)
-    ui.SetVisibility(TAB, TP, "Dwell Time (sec)",  tp_on and is_ptb and not is_tween)
+    ui.SetVisibility(TAB, TP, "Dwell Time (sec)",  tp_on and is_ptb)
     ui.SetVisibility(TAB, TP, "Steal Dwell (sec)", tp_on and is_ptb and not is_tween)
     ui.SetVisibility(TAB, TP, "Retry on Miss",     tp_on and is_ptb)
     ui.SetVisibility(TAB, TP, "Max Retries",       tp_on and is_ptb and retry_on)
