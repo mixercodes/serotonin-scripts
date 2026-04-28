@@ -60,6 +60,7 @@ ui.NewColorpicker(TAB, VIS, "Away Fill Color", {r=255, g=80, b=80, a=40}, true)
 
 -- defaults
 ui.setValue(TAB, SPD, "Speed Enabled",    false)
+ui.setValue(TAB, SPD, "Speed Key",        0x06)
 ui.setValue(TAB, SPD, "Speed Multiplier", 2.0)
 ui.setValue(TAB, SPD, "Smoothing",        0.0)
 ui.setValue(TAB, SPD, "Enable Speed Cap", false)
