@@ -189,6 +189,11 @@ local function hotkey_clicked(label)
     return edge
 end
 
+local function hotkey_is_hold(label)
+    local hk = ui.getHotkey(TAB, TP, label)
+    return (hk and hk.mode or 0) == 0
+end
+
 local function front_target(hrp)
     return hrp.Position + Vector3.new(0, OFF_UP, 0)
 end
@@ -440,7 +445,11 @@ cheat.register("onUpdate", function()
         end
 
     elseif mode == 1 then
-        if clicked then glue_active = not glue_active end
+        if hotkey_is_hold("Teleport Key") then
+            glue_active = ui.getValue(TAB, TP, "Teleport Key") == true
+        elseif clicked then
+            glue_active = not glue_active
+        end
         if glue_active then
             local ok = pcall(function()
                 ball.Position = front_target(hrp)
@@ -787,7 +796,9 @@ cheat.register("onUpdate", function()
         return
     end
 
-    if hotkey_clicked("Auto Goal Key") then
+    if hotkey_is_hold("Auto Goal Key") then
+        auto_goal_active = ui.getValue(TAB, TP, "Auto Goal Key") == true
+    elseif hotkey_clicked("Auto Goal Key") then
         auto_goal_active = not auto_goal_active
     end
 
