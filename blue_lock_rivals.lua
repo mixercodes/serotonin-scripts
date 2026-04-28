@@ -16,6 +16,7 @@ ui.newTab(TAB, "BL:R")
 -- [Ball Physics]
 ui.NewContainer(TAB, SPD, "Ball Physics", { autosize = true })
 ui.NewCheckbox(TAB, SPD, "Speed Enabled")
+ui.newHotkey(TAB, SPD, "Speed Key", true)
 ui.newSliderFloat(TAB, SPD, "Speed Multiplier", 1.0, 10.0)
 ui.newSliderFloat(TAB, SPD, "Smoothing", 0.0, 1.0)
 ui.NewCheckbox(TAB, SPD, "Enable Speed Cap")
@@ -108,22 +109,20 @@ local function refresh_ball_refs()
     free_ball  = ball_model and ball_model:FindFirstChild("RootPart") or nil
     world_ball = game.Workspace:FindFirstChild("Football")
 
+    -- Football always stays in Workspace (never reparented to a character).
+    -- Use OnPlayer/Char values to detect who is holding it.
     held_ball   = nil
     holder_char = nil
-    for _, child in ipairs(game.Workspace:GetChildren()) do
-        if child.ClassName == "Model" and child:FindFirstChild("Football") then
-            held_ball   = child:FindFirstChild("Football")
-            holder_char = child
-            ball_status = child.Name .. " (held)"
+    if world_ball then
+        local op   = world_ball:FindFirstChild("OnPlayer")
+        local char = world_ball:FindFirstChild("Char")
+        if op and op.Value == true and char and char.Value then
+            held_ball   = world_ball
+            holder_char = char.Value
+            ball_status = (char.Value.Name or "?") .. " (held)"
             return
         end
-    end
-
-    if world_ball then
         local ok, spd = pcall(function() return world_ball.Velocity.Magnitude end)
-        ball_status = (ok and spd or 0) > 0.5 and "ball in motion" or "ball idle"
-    elseif free_ball and free_ball.Parent then
-        local ok, spd = pcall(function() return free_ball.Velocity.Magnitude end)
         ball_status = (ok and spd or 0) > 0.5 and "ball in motion" or "ball idle"
     else
         ball_status = "no ball"
@@ -182,15 +181,18 @@ local function now_sec()
 end
 
 local hk_prev = {}
-local function hotkey_clicked(label)
-    local now  = ui.getValue(TAB, TP, label)
-    local edge = now and not (hk_prev[label] or false)
-    hk_prev[label] = now
+local function hotkey_clicked(label, container)
+    container = container or TP
+    local key  = container .. "|" .. label
+    local now  = ui.getValue(TAB, container, label)
+    local edge = now and not (hk_prev[key] or false)
+    hk_prev[key] = now
     return edge
 end
 
-local function hotkey_is_hold(label)
-    local hk = ui.getHotkey(TAB, TP, label)
+local function hotkey_is_hold(label, container)
+    container = container or TP
+    local hk = ui.getHotkey(TAB, container, label)
     return (hk and hk.mode or 0) == 0
 end
 
@@ -204,6 +206,7 @@ local CONFIG_FILE = "blr_config.lua"
 
 local SAVE_WIDGETS = {
     {SPD, "Speed Enabled",     "val"},
+    {SPD, "Speed Key",         "hk"},
     {SPD, "Speed Multiplier",  "val"},
     {SPD, "Smoothing",         "val"},
     {SPD, "Enable Speed Cap",  "val"},
@@ -360,68 +363,81 @@ cheat.register("onUpdate", function()
     ui.SetVisibility(TAB, VIS, "Away Fill Color", goal_fill)
 end)
 
--- [Speed logic]
-
-cheat.register("onUpdate", function()
-    if not ui.getValue(TAB, SPD, "Speed Enabled") then return end
-
-    local multiplier = ui.getValue(TAB, SPD, "Speed Multiplier")
-    local smoothing  = ui.getValue(TAB, SPD, "Smoothing")
-    local cap        = ui.getValue(TAB, SPD, "Enable Speed Cap")
-    local max_speed  = ui.getValue(TAB, SPD, "Max Speed Cap")
-
-    local target = (held_ball and held_ball.Parent and held_ball)
-                or (free_ball and free_ball.Parent and free_ball)
-    if not target then return end
-
-    local ok, vel = pcall(function() return target.Velocity end)
-    if not ok or not vel then return end
-    if vel.Magnitude < 0.1 then return end
-
-    local boosted = vel * multiplier
-    if smoothing > 0 then
-        boosted = prev_vel:Lerp(boosted, 1 - smoothing)
-    end
-    if cap and boosted.Magnitude > max_speed then
-        boosted = boosted.Unit * max_speed
-    end
-
-    pcall(function() target.Velocity = boosted end)
-    prev_vel = boosted
-end)
-
--- [Arc logic]
+-- [Speed / Arc logic]
 
 local flat_lock_y = nil
 
-cheat.register("onUpdate", function()
-    if not ui.getValue(TAB, SPD, "Ball Arc") then flat_lock_y = nil; return end
-    local arc = ui.getValue(TAB, SPD, "Arc Level")
+local speed_active = false
 
-    local target = (held_ball and held_ball.Parent and held_ball)
-                or (free_ball and free_ball.Parent and free_ball)
-    if not target then flat_lock_y = nil; return end
+cheat.register("onUpdate", function()
+    local spd_enabled = ui.getValue(TAB, SPD, "Speed Enabled")
+    if spd_enabled then
+        if hotkey_is_hold("Speed Key", SPD) then
+            speed_active = ui.getValue(TAB, SPD, "Speed Key") == true
+        elseif hotkey_clicked("Speed Key", SPD) then
+            speed_active = not speed_active
+        end
+    else
+        speed_active = false
+    end
+
+    local spd_on = spd_enabled and speed_active
+    local arc_on = ui.getValue(TAB, SPD, "Ball Arc")
+    if not spd_on and not arc_on then flat_lock_y = nil; return end
+
+    local target = world_ball
+    if not target or not target.Parent then flat_lock_y = nil; return end
 
     local ok, vel = pcall(function() return target.Velocity end)
     if not ok or not vel then return end
+    if vel.Magnitude < 0.5 then flat_lock_y = nil; return end
 
-    local horiz = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
-    if horiz < 0.1 then flat_lock_y = nil; return end
+    -- [speed multiplier]
+    if spd_on then
+        local multiplier = ui.getValue(TAB, SPD, "Speed Multiplier")
+        local smoothing  = ui.getValue(TAB, SPD, "Smoothing")
+        local cap        = ui.getValue(TAB, SPD, "Enable Speed Cap")
+        local max_speed  = ui.getValue(TAB, SPD, "Max Speed Cap")
 
-    pcall(function() target.Velocity = Vector3.new(vel.X, vel.Y * arc, vel.Z) end)
-
-    if arc <= 0.0 then
-        if not flat_lock_y then
-            local ok2, pos = pcall(function() return target.Position end)
-            flat_lock_y = ok2 and pos and pos.Y or nil
+        local boosted = vel * multiplier
+        if smoothing > 0 then
+            boosted = prev_vel:Lerp(boosted, 1 - smoothing)
         end
-        if flat_lock_y then
+        if cap and boosted.Magnitude > max_speed then
+            boosted = boosted.Unit * max_speed
+        end
+        pcall(function() target.Velocity = boosted end)
+        prev_vel = boosted
+        vel = boosted
+    end
+
+    -- [arc / flat path]
+    if arc_on then
+        local arc   = ui.getValue(TAB, SPD, "Arc Level")
+        local horiz = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
+        if horiz < 0.1 then flat_lock_y = nil; return end
+
+        if arc <= 0.0 then
+            if not flat_lock_y then
+                local ok2, pos = pcall(function() return target.Position end)
+                flat_lock_y = ok2 and pos and pos.Y or nil
+            end
+            pcall(function() target.Velocity = Vector3.new(vel.X, 0, vel.Z) end)
+            if flat_lock_y then
+                pcall(function()
+                    local pos = target.Position
+                    if math.abs(pos.Y - flat_lock_y) > 0.3 then
+                        target.Position = Vector3.new(pos.X, flat_lock_y, pos.Z)
+                    end
+                end)
+            end
+        else
+            -- nudge Y toward target ratio each frame rather than collapsing instantly
+            local target_vy = vel.Y * arc
             pcall(function()
-                local pos = target.Position
-                if math.abs(pos.Y - flat_lock_y) > 0.5 then
-                    target.Position = Vector3.new(pos.X, flat_lock_y, pos.Z)
-                end
+                target.Velocity = Vector3.new(vel.X, vel.Y + (target_vy - vel.Y) * 0.2, vel.Z)
             end)
+            flat_lock_y = nil
         end
     else
         flat_lock_y = nil
@@ -776,8 +792,6 @@ cheat.register("onPaint", function()
     local font = VIS_FONTS[(ui.getValue(TAB, VIS, "Font") or 0) + 1] or "Tahoma"
 
     local display = world_ball
-                 or (held_ball and held_ball.Parent and held_ball)
-                 or (free_ball and free_ball.Parent and free_ball)
     if display then
         local ok, v = pcall(function() return display.Velocity.Magnitude end)
         info_speed = ok and v and math.floor(v * 10) / 10 or 0
