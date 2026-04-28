@@ -610,7 +610,10 @@ cheat.register("onUpdate", function()
             end
 
             local elapsed = now_sec() - ptb_dwell_start
-            if use_tween or elapsed >= dwell then
+            if use_tween then
+                pcall(function() hrp.Position = ball_approach_target() end)
+            end
+            if elapsed >= dwell then
                 local retry_on = ui.getValue(TAB, TP, "Retry on Miss")
                 local max_r    = ui.getValue(TAB, TP, "Max Retries")
                 if retry_on and ptb_retries < max_r then
