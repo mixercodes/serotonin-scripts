@@ -199,15 +199,7 @@ Game data (team names, instance names, folder structure, object positions) can c
 
 **Always ask the user first:** "Do you have an existing utility/library for this?" before implementing from scratch. Production scripts often already have working implementations (TweenService, scheduler, input helpers, etc.). Building on top of a known-working base is always preferable to reinventing it.
 
-**For movement/physics scripts — always test `instance.Position = value` first via the bridge before trying anything else.** It is the correct and confirmed mechanism. Do not reach for `Velocity` writes or memory writes for movement — velocity is server-overridden within one physics step in most games.
-
-**Confirmed working movement pattern** (verified in production):
-```lua
--- Spam-write position each frame to win the race against server reconciliation:
-for _ = 1, 4000 do
-    hrp.Position = lerped_position
-end
-```
+**For movement/physics scripts — `instance.Position = value` is the correct mechanism.** Do not reach for `Velocity` writes or memory writes for movement.
 
 **Smooth tweening requires no external library.** Build it from first principles when needed:
 - Timing: `utility.GetTickCount()` for elapsed ms
