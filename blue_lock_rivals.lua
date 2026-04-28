@@ -26,7 +26,7 @@ ui.newSliderFloat(TAB, SPD, "Arc Level", 0.0, 1.0)
 -- [Ball Teleport]
 ui.NewContainer(TAB, TP, "Ball Teleport", { autosize = true, next = true })
 ui.NewCheckbox(TAB, TP, "Teleport Enabled")
-ui.newHotkey(TAB, TP, "Teleport Key", true)
+ui.newHotkey(TAB, TP, "Teleport Key")
 ui.newDropdown(TAB, TP, "TP Mode", TP_MODES)
 ui.newDropdown(TAB, TP, "Travel Mode", TRAVEL_MODES)
 ui.newSliderFloat(TAB, TP, "Tween Time (sec)", 0.05, 1.0)
@@ -37,7 +37,7 @@ ui.NewCheckbox(TAB, TP, "Retry on Miss")
 ui.NewSliderInt(TAB, TP, "Max Retries", 1, 10)
 ui.NewCheckbox(TAB, TP, "Preserve Momentum")
 ui.NewCheckbox(TAB, TP, "Auto Goal")
-ui.newHotkey(TAB, TP, "Auto Goal Key", true)
+ui.newHotkey(TAB, TP, "Auto Goal Key")
 ui.newDropdown(TAB, TP, "Goal Target", {"Auto (enemy)", "Home", "Away"})
 
 -- [Visuals]
