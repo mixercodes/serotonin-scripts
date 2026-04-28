@@ -198,6 +198,97 @@ local function front_target(hrp)
     return hrp.Position + Vector3.new(0, OFF_UP, 0)
 end
 
+-- [Config]
+
+local CONFIG_FILE = "blr_config.lua"
+
+local SAVE_WIDGETS = {
+    {SPD, "Speed Enabled",     "val"},
+    {SPD, "Speed Multiplier",  "val"},
+    {SPD, "Smoothing",         "val"},
+    {SPD, "Enable Speed Cap",  "val"},
+    {SPD, "Max Speed Cap",     "val"},
+    {SPD, "Ball Arc",          "val"},
+    {SPD, "Arc Level",         "val"},
+    {TP,  "Teleport Enabled",  "val"},
+    {TP,  "Teleport Key",      "hk"},
+    {TP,  "TP Mode",           "val"},
+    {TP,  "Travel Mode",       "val"},
+    {TP,  "Tween Time (sec)",  "val"},
+    {TP,  "Return Time (sec)", "val"},
+    {TP,  "Dwell Time (sec)",  "val"},
+    {TP,  "Steal Dwell (sec)", "val"},
+    {TP,  "Retry on Miss",     "val"},
+    {TP,  "Max Retries",       "val"},
+    {TP,  "Preserve Momentum", "val"},
+    {TP,  "Auto Goal",         "val"},
+    {TP,  "Auto Goal Key",     "hk"},
+    {TP,  "Goal Target",       "val"},
+    {VIS, "Font",              "val"},
+    {VIS, "Info Display",      "val"},
+    {VIS, "Ball ESP",          "val"},
+    {VIS, "Ball Color",        "val"},
+    {VIS, "Ball ESP Text",     "val"},
+    {VIS, "Ball Fill",         "val"},
+    {VIS, "Ball Fill Color",   "val"},
+    {VIS, "Goal ESP",          "val"},
+    {VIS, "Home Color",        "val"},
+    {VIS, "Away Color",        "val"},
+    {VIS, "Goal ESP Text",     "val"},
+    {VIS, "Goal Fill",         "val"},
+    {VIS, "Home Fill Color",   "val"},
+    {VIS, "Away Fill Color",   "val"},
+}
+
+local function ser(v)
+    local t = type(v)
+    if t == "boolean" then return v and "true" or "false"
+    elseif t == "number" then return string.format("%.6g", v)
+    elseif t == "table" then
+        local parts = {}
+        for k, val in pairs(v) do
+            parts[#parts + 1] = string.format("[%q]=%s", tostring(k), ser(val))
+        end
+        return "{" .. table.concat(parts, ",") .. "}"
+    end
+    return "nil"
+end
+
+local function config_save()
+    local lines = {"return {"}
+    for _, w in ipairs(SAVE_WIDGETS) do
+        local container, label, wtype = w[1], w[2], w[3]
+        local val
+        if wtype == "hk" then
+            local hk = ui.getHotkey(TAB, container, label)
+            val = hk and hk.key or 0
+        else
+            val = ui.getValue(TAB, container, label)
+        end
+        lines[#lines + 1] = string.format("  [%q]=%s,", container .. "|" .. label, ser(val))
+    end
+    lines[#lines + 1] = "}"
+    file.write(CONFIG_FILE, table.concat(lines, "\n"))
+end
+
+local function config_load()
+    local src = file.read(CONFIG_FILE)
+    if not src then return end
+    local fn = loadstring(src)
+    if not fn then return end
+    local ok, data = pcall(fn)
+    if not ok or type(data) ~= "table" then return end
+    for _, w in ipairs(SAVE_WIDGETS) do
+        local container, label = w[1], w[2]
+        local val = data[container .. "|" .. label]
+        if val ~= nil then
+            pcall(function() ui.setValue(TAB, container, label, val) end)
+        end
+    end
+end
+
+config_load()
+
 local function picker_to_color3(t)
     if not t then return COLOR_WHITE end
     return Color3.fromRGB(t.r or 255, t.g or 255, t.b or 255)
@@ -879,4 +970,5 @@ cheat.register("shutdown", function()
     ret_use_tween      = false
     flat_lock_y        = nil
     keyboard.Release("e")
+    config_save()
 end)
