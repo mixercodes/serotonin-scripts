@@ -587,10 +587,19 @@ cheat.register("onUpdate", function()
     else
         local use_tween = ui.getValue(TAB, TP, "Travel Mode") == 1
 
-        local is_local_holding = holder_char and local_char and holder_char.Name == local_char.Name
+        -- live OnPlayer check to avoid 100ms stale cache sending steal to wrong location
+        local live_holder = nil
+        if world_ball then
+            local op = world_ball:FindFirstChild("OnPlayer")
+            local ch = world_ball:FindFirstChild("Char")
+            if op and op.Value == true and ch and ch.Value then
+                live_holder = ch.Value
+            end
+        end
+        local is_local_holding = live_holder and local_char and live_holder == local_char
         local enemy_hrp = nil
-        if holder_char and holder_char.Parent and not is_local_holding then
-            enemy_hrp = holder_char:FindFirstChild("HumanoidRootPart")
+        if live_holder and live_holder.Parent and not is_local_holding then
+            enemy_hrp = live_holder:FindFirstChild("HumanoidRootPart")
         end
 
         local function ball_approach_target()
