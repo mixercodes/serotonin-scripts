@@ -817,17 +817,25 @@ cheat.register("onPaint", function()
 
     if ui.getValue(TAB, VIS, "Info Display") then
         local _sw, sh = cheat.GetWindowSize()
-        local x, y = 10, sh - 85
+        local x, y = 10, sh - 115
         local gg_target_idx   = ui.getValue(TAB, TP, "Goal Target")
         local gg_target_names = {"Auto", "Home", "Away"}
         local gg_label = auto_goal_active
             and ("On -> " .. (gg_target_names[gg_target_idx + 1] or "?"))
             or "Off"
+        local spd_label = ui.getValue(TAB, SPD, "Speed Enabled")
+            and (speed_active and "On" or "Off (key)")
+            or "Off"
+        local arc_label = ui.getValue(TAB, SPD, "Ball Arc")
+            and (arc_active and "On" or "Off (key)")
+            or "Off"
         draw.TextOutlined("BL:R", x, y, COLOR_BLUE, font, 255)
         draw.TextOutlined("Speed:  " .. tostring(info_speed) .. " (" .. ball_status .. ")", x, y + 15, COLOR_WHITE, font, 255)
-        draw.TextOutlined("Dist:   " .. info_dist,     x, y + 30, COLOR_WHITE, font, 255)
-        draw.TextOutlined("TP:     " .. info_tp_status, x, y + 45, COLOR_WHITE, font, 255)
+        draw.TextOutlined("Dist:   " .. info_dist,      x, y + 30, COLOR_WHITE, font, 255)
+        draw.TextOutlined("TP:     " .. info_tp_status,  x, y + 45, COLOR_WHITE, font, 255)
         draw.TextOutlined("Goal:   " .. gg_label,        x, y + 60, COLOR_WHITE, font, 255)
+        draw.TextOutlined("SpeedX: " .. spd_label,       x, y + 75, COLOR_WHITE, font, 255)
+        draw.TextOutlined("Arc:    " .. arc_label,        x, y + 90, COLOR_WHITE, font, 255)
     end
 
     local ball_esp_on  = ui.getValue(TAB, VIS, "Ball ESP")
