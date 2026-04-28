@@ -22,6 +22,7 @@ ui.newSliderFloat(TAB, SPD, "Smoothing", 0.0, 1.0)
 ui.NewCheckbox(TAB, SPD, "Enable Speed Cap")
 ui.newSliderFloat(TAB, SPD, "Max Speed Cap", 10.0, 500.0)
 ui.NewCheckbox(TAB, SPD, "Ball Arc")
+ui.newHotkey(TAB, SPD, "Arc Key", true)
 ui.newSliderFloat(TAB, SPD, "Arc Level", 0.0, 1.0)
 
 -- [Ball Teleport]
@@ -66,6 +67,7 @@ ui.setValue(TAB, SPD, "Smoothing",        0.0)
 ui.setValue(TAB, SPD, "Enable Speed Cap", false)
 ui.setValue(TAB, SPD, "Max Speed Cap",    150.0)
 ui.setValue(TAB, SPD, "Ball Arc",         false)
+ui.setValue(TAB, SPD, "Arc Key",          0x05)
 ui.setValue(TAB, SPD, "Arc Level",        0.5)
 ui.setValue(TAB, TP,  "Teleport Enabled", false)
 ui.setValue(TAB, TP,  "Teleport Key",     0x46)
@@ -213,6 +215,7 @@ local SAVE_WIDGETS = {
     {SPD, "Enable Speed Cap",  "val"},
     {SPD, "Max Speed Cap",     "val"},
     {SPD, "Ball Arc",          "val"},
+    {SPD, "Arc Key",           "hk"},
     {SPD, "Arc Level",         "val"},
     {TP,  "Teleport Enabled",  "val"},
     {TP,  "Teleport Key",      "hk"},
@@ -369,6 +372,7 @@ end)
 local flat_lock_y = nil
 
 local speed_active = false
+local arc_active   = false
 
 cheat.register("onUpdate", function()
     local spd_enabled = ui.getValue(TAB, SPD, "Speed Enabled")
@@ -383,7 +387,18 @@ cheat.register("onUpdate", function()
     end
 
     local spd_on = spd_enabled and speed_active
-    local arc_on = ui.getValue(TAB, SPD, "Ball Arc")
+
+    local arc_enabled = ui.getValue(TAB, SPD, "Ball Arc")
+    if arc_enabled then
+        if hotkey_is_hold("Arc Key", SPD) then
+            arc_active = ui.getValue(TAB, SPD, "Arc Key") == true
+        elseif hotkey_clicked("Arc Key", SPD) then
+            arc_active = not arc_active
+        end
+    else
+        arc_active = false
+    end
+    local arc_on = arc_enabled and arc_active
     if not spd_on and not arc_on then flat_lock_y = nil; return end
 
     local target = world_ball
