@@ -119,7 +119,7 @@ local function refresh_ball_refs()
     if world_ball then
         local op   = world_ball:FindFirstChild("OnPlayer")
         local char = world_ball:FindFirstChild("Char")
-        if op and op.Value == true and char and char.Value then
+        if op and op.Value ~= 0 and char and char.Value then
             held_ball   = world_ball
             holder_char = char.Value
             ball_status = (char.Value.Name or "?") .. " (held)"
@@ -612,7 +612,7 @@ cheat.register("onUpdate", function()
         if world_ball then
             local op = world_ball:FindFirstChild("OnPlayer")
             local ch = world_ball:FindFirstChild("Char")
-            if op and op.Value == true and ch and ch.Value then
+            if op and op.Value ~= 0 and ch and ch.Value then
                 live_holder = ch.Value
             end
         end
