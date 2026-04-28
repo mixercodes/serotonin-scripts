@@ -1,45 +1,48 @@
 -- blue_lock_rivals.lua
 
-local KeyOptions = {"f1","f2","f3","f4","f5","f6","q","e","r","t","z","x","c","v","g","f"}
-local TP_MODES   = {"Ball to Player (pull)", "Ball Control (glue)", "Snap / Auto Steal"}
-local VIS_FONTS  = {"Tahoma", "Verdana", "ConsolasBold", "SmallestPixel"}
+local TP_MODES     = {"Ball to Player (pull)", "Ball Control (glue)", "Player to Ball"}
+local TRAVEL_MODES = {"Instant", "Tween"}
+local VIS_FONTS    = {"SmallestPixel", "Verdana", "ConsolasBold", "Tahoma"}
 
 local TAB = "ballt_tab"
 local SPD = "ballt_spd"
 local TP  = "ballt_tp"
 local VIS = "ballt_vis"
 
+local OFF_UP = 2
+
 ui.newTab(TAB, "BL:R")
 
--- [Ball Physics container]
+-- [Ball Physics]
 ui.NewContainer(TAB, SPD, "Ball Physics", { autosize = true })
 ui.NewCheckbox(TAB, SPD, "Speed Enabled")
-ui.newSliderFloat(TAB, SPD, "Speed Multiplier", 1.0, 10.0, 2.0)
-ui.newSliderFloat(TAB, SPD, "Activation Threshold", 0.5, 20.0, 2.0)
-ui.newSliderFloat(TAB, SPD, "Smoothing", 0.0, 1.0, 0.0)
+ui.newSliderFloat(TAB, SPD, "Speed Multiplier", 1.0, 10.0)
+ui.newSliderFloat(TAB, SPD, "Smoothing", 0.0, 1.0)
 ui.NewCheckbox(TAB, SPD, "Enable Speed Cap")
-ui.newSliderFloat(TAB, SPD, "Max Speed Cap", 10.0, 500.0, 150.0)
-ui.newSliderFloat(TAB, SPD, "Arc", 0.0, 1.0)
+ui.newSliderFloat(TAB, SPD, "Max Speed Cap", 10.0, 500.0)
+ui.NewCheckbox(TAB, SPD, "Ball Arc")
+ui.newSliderFloat(TAB, SPD, "Arc Level", 0.0, 1.0)
 
--- [Teleport container]
+-- [Ball Teleport]
 ui.NewContainer(TAB, TP, "Ball Teleport", { autosize = true, next = true })
 ui.NewCheckbox(TAB, TP, "Teleport Enabled")
-ui.newDropdown(TAB, TP, "TP Mode", TP_MODES, 3)
-ui.newDropdown(TAB, TP, "Teleport Key", KeyOptions, 11) -- default z
-ui.newSliderFloat(TAB, TP, "Offset Forward", 0.0, 10.0, 0.0)
-ui.newSliderFloat(TAB, TP, "Offset Up", 0.0, 10.0, 2.0)
-ui.newSliderFloat(TAB, TP, "Dwell Time (sec)", 0.0, 5.0, 0.01)
-ui.newSliderFloat(TAB, TP, "Steal Dwell (sec)", 0.3, 3.0, 0.6)
-ui.NewCheckbox(TAB, TP, "Retry Snap")
-ui.NewSliderInt(TAB, TP, "Max Retries", 1, 5)
+ui.newHotkey(TAB, TP, "Teleport Key", true)
+ui.newDropdown(TAB, TP, "TP Mode", TP_MODES)
+ui.newDropdown(TAB, TP, "Travel Mode", TRAVEL_MODES)
+ui.newSliderFloat(TAB, TP, "Tween Time (sec)", 0.05, 5.0)
+ui.newSliderFloat(TAB, TP, "Return Time (sec)", 0.05, 5.0)
+ui.newSliderFloat(TAB, TP, "Dwell Time (sec)", 0.0, 5.0)
+ui.newSliderFloat(TAB, TP, "Steal Dwell (sec)", 0.1, 5.0)
+ui.NewCheckbox(TAB, TP, "Retry on Miss")
+ui.NewSliderInt(TAB, TP, "Max Retries", 1, 10)
 ui.NewCheckbox(TAB, TP, "Preserve Momentum")
 ui.NewCheckbox(TAB, TP, "Auto Goal")
-ui.newDropdown(TAB, TP, "Goal Target", {"Auto (enemy)", "Home", "Away"}, 1)
-ui.newDropdown(TAB, TP, "Auto Goal Key", KeyOptions, 16) -- default f
+ui.newHotkey(TAB, TP, "Auto Goal Key", true)
+ui.newDropdown(TAB, TP, "Goal Target", {"Auto (enemy)", "Home", "Away"})
 
--- [Visuals container]
+-- [Visuals]
 ui.NewContainer(TAB, VIS, "Visuals", { autosize = true, next = true })
-ui.newDropdown(TAB, VIS, "Font", VIS_FONTS, 1)
+ui.newDropdown(TAB, VIS, "Font", VIS_FONTS)
 ui.NewCheckbox(TAB, VIS, "Info Display")
 ui.NewCheckbox(TAB, VIS, "Ball ESP")
 ui.NewColorpicker(TAB, VIS, "Ball Color", {r=255, g=255, b=255, a=255}, true)
@@ -54,40 +57,55 @@ ui.NewCheckbox(TAB, VIS, "Goal Fill")
 ui.NewColorpicker(TAB, VIS, "Home Fill Color", {r=0, g=180, b=255, a=40}, true)
 ui.NewColorpicker(TAB, VIS, "Away Fill Color", {r=255, g=80, b=80, a=40}, true)
 
-ui.setValue(TAB, SPD, "Speed Enabled", false)
+-- defaults
+ui.setValue(TAB, SPD, "Speed Enabled",    false)
+ui.setValue(TAB, SPD, "Speed Multiplier", 2.0)
+ui.setValue(TAB, SPD, "Smoothing",        0.0)
 ui.setValue(TAB, SPD, "Enable Speed Cap", false)
-ui.setValue(TAB, SPD, "Arc", 1.0)
+ui.setValue(TAB, SPD, "Max Speed Cap",    150.0)
+ui.setValue(TAB, SPD, "Ball Arc",         false)
+ui.setValue(TAB, SPD, "Arc Level",        0.5)
 ui.setValue(TAB, TP,  "Teleport Enabled", false)
-ui.setValue(TAB, TP,  "Retry Snap", true)
-ui.setValue(TAB, TP,  "Max Retries", 3)
+ui.setValue(TAB, TP,  "Teleport Key",     0x46)
+ui.setValue(TAB, TP,  "TP Mode",          3)
+ui.setValue(TAB, TP,  "Travel Mode",      1)
+ui.setValue(TAB, TP,  "Tween Time (sec)", 0.5)
+ui.setValue(TAB, TP,  "Return Time (sec)", 0.5)
+ui.setValue(TAB, TP,  "Dwell Time (sec)", 0.3)
+ui.setValue(TAB, TP,  "Steal Dwell (sec)", 0.6)
+ui.setValue(TAB, TP,  "Retry on Miss",    false)
+ui.setValue(TAB, TP,  "Max Retries",      3)
 ui.setValue(TAB, TP,  "Preserve Momentum", true)
-ui.setValue(TAB, TP,  "Auto Goal", false)
-ui.setValue(TAB, VIS, "Info Display", true)
-ui.setValue(TAB, VIS, "Ball ESP", false)
-ui.setValue(TAB, VIS, "Ball ESP Text", true)
-ui.setValue(TAB, VIS, "Ball Fill", false)
-ui.setValue(TAB, VIS, "Goal ESP", false)
-ui.setValue(TAB, VIS, "Goal ESP Text", true)
-ui.setValue(TAB, VIS, "Goal Fill", false)
+ui.setValue(TAB, TP,  "Auto Goal",        false)
+ui.setValue(TAB, TP,  "Auto Goal Key",    0x47)
+ui.setValue(TAB, TP,  "Goal Target",      1)
+ui.setValue(TAB, VIS, "Font",             1)
+ui.setValue(TAB, VIS, "Info Display",     true)
+ui.setValue(TAB, VIS, "Ball ESP",         false)
+ui.setValue(TAB, VIS, "Ball ESP Text",    true)
+ui.setValue(TAB, VIS, "Ball Fill",        false)
+ui.setValue(TAB, VIS, "Goal ESP",         false)
+ui.setValue(TAB, VIS, "Goal ESP Text",    true)
+ui.setValue(TAB, VIS, "Goal Fill",        false)
 
 -- [Shared state]
 
-local free_ball    = nil
-local held_ball    = nil
-local world_ball   = nil
-local holder_char  = nil
-local local_char   = nil
-local prev_vel     = Vector3.new(0, 0, 0)
-local ball_status  = "---"
+local free_ball   = nil
+local held_ball   = nil
+local world_ball  = nil
+local holder_char = nil
+local local_char  = nil
+local prev_vel    = Vector3.new(0, 0, 0)
+local ball_status = "---"
 
-local COLOR_WHITE  = Color3.new(1, 1, 1)
-local COLOR_YELLOW = Color3.fromRGB(255, 220, 0)
+local COLOR_WHITE = Color3.new(1, 1, 1)
+local COLOR_BLUE  = Color3.fromHex("#3E79A7")
 
 local _screen_buf = {}
 
 local function refresh_ball_refs()
     local ball_model = game.Workspace:FindFirstChild("Ball")
-    free_ball = ball_model and ball_model:FindFirstChild("RootPart") or nil
+    free_ball  = ball_model and ball_model:FindFirstChild("RootPart") or nil
     world_ball = game.Workspace:FindFirstChild("Football")
 
     held_ball   = nil
@@ -103,17 +121,17 @@ local function refresh_ball_refs()
 
     if world_ball then
         local ok, spd = pcall(function() return world_ball.Velocity.Magnitude end)
-        ball_status = (ok and spd or 0) > 0.5 and "ball in air" or "ball idle"
+        ball_status = (ok and spd or 0) > 0.5 and "ball in motion" or "ball idle"
     elseif free_ball and free_ball.Parent then
         local ok, spd = pcall(function() return free_ball.Velocity.Magnitude end)
-        ball_status = (ok and spd or 0) > 0.5 and "ball in air" or "ball idle"
+        ball_status = (ok and spd or 0) > 0.5 and "ball in motion" or "ball idle"
     else
         ball_status = "no ball"
     end
 end
 
 local function refresh_local_char()
-    local lp = game.LocalPlayer
+    local lp   = game.LocalPlayer
     local name = lp and lp.Name
     local_char = name and game.Workspace:FindFirstChild(name) or nil
 end
@@ -163,19 +181,16 @@ local function now_sec()
     return utility.GetTickCount() / 1000
 end
 
-local key_prev = {}
-
-local function key_clicked(key)
-    local now = keyboard.IsPressed(key)
-    local edge = now and not (key_prev[key] or false)
-    key_prev[key] = now
+local hk_prev = {}
+local function hotkey_clicked(label)
+    local now  = ui.getValue(TAB, TP, label)
+    local edge = now and not (hk_prev[label] or false)
+    hk_prev[label] = now
     return edge
 end
 
-local function front_target(hrp, off_fwd, off_up)
-    local ok, lv = pcall(function() return hrp.CFrame.LookVector end)
-    local fwd = ok and lv or Vector3.new(0, 0, -1)
-    return hrp.Position + fwd * off_fwd + Vector3.new(0, off_up, 0)
+local function front_target(hrp)
+    return hrp.Position + Vector3.new(0, OFF_UP, 0)
 end
 
 local function picker_to_color3(t)
@@ -199,12 +214,63 @@ cheat.register("onUpdate", function()
     end
 end)
 
+-- [Conditional visibility]
+
+cheat.register("onUpdate", function()
+    local tp_on    = ui.getValue(TAB, TP, "Teleport Enabled")
+    local mode     = ui.getValue(TAB, TP, "TP Mode")
+    local is_pull  = mode == 0
+    local is_ptb   = mode == 2
+    local is_tween = is_ptb and ui.getValue(TAB, TP, "Travel Mode") == 1
+    local retry_on = is_ptb and ui.getValue(TAB, TP, "Retry on Miss")
+    local auto_g   = tp_on and ui.getValue(TAB, TP, "Auto Goal")
+
+    local spd_on  = ui.getValue(TAB, SPD, "Speed Enabled")
+    local cap_on  = spd_on and ui.getValue(TAB, SPD, "Enable Speed Cap")
+    local arc_on  = ui.getValue(TAB, SPD, "Ball Arc")
+
+    ui.SetVisibility(TAB, SPD, "Speed Multiplier", spd_on)
+    ui.SetVisibility(TAB, SPD, "Smoothing",        spd_on)
+    ui.SetVisibility(TAB, SPD, "Enable Speed Cap", spd_on)
+    ui.SetVisibility(TAB, SPD, "Max Speed Cap",    cap_on)
+    ui.SetVisibility(TAB, SPD, "Arc Level",        arc_on)
+
+    ui.SetVisibility(TAB, TP, "Teleport Key",      tp_on)
+    ui.SetVisibility(TAB, TP, "TP Mode",           tp_on)
+    ui.SetVisibility(TAB, TP, "Travel Mode",       tp_on and is_ptb)
+    ui.SetVisibility(TAB, TP, "Tween Time (sec)",  tp_on and is_tween)
+    ui.SetVisibility(TAB, TP, "Return Time (sec)", tp_on and is_tween)
+    ui.SetVisibility(TAB, TP, "Dwell Time (sec)",  tp_on and is_ptb)
+    ui.SetVisibility(TAB, TP, "Steal Dwell (sec)", tp_on and is_ptb)
+    ui.SetVisibility(TAB, TP, "Retry on Miss",     tp_on and is_ptb)
+    ui.SetVisibility(TAB, TP, "Max Retries",       tp_on and is_ptb and retry_on)
+    ui.SetVisibility(TAB, TP, "Preserve Momentum", tp_on and is_pull)
+    ui.SetVisibility(TAB, TP, "Auto Goal",         tp_on)
+    ui.SetVisibility(TAB, TP, "Auto Goal Key",     auto_g)
+    ui.SetVisibility(TAB, TP, "Goal Target",       auto_g)
+
+    local ball_esp  = ui.getValue(TAB, VIS, "Ball ESP")
+    local ball_fill = ball_esp and ui.getValue(TAB, VIS, "Ball Fill")
+    local goal_esp  = ui.getValue(TAB, VIS, "Goal ESP")
+    local goal_fill = goal_esp and ui.getValue(TAB, VIS, "Goal Fill")
+
+    ui.SetVisibility(TAB, VIS, "Ball Color",      ball_esp)
+    ui.SetVisibility(TAB, VIS, "Ball ESP Text",   ball_esp)
+    ui.SetVisibility(TAB, VIS, "Ball Fill",       ball_esp)
+    ui.SetVisibility(TAB, VIS, "Ball Fill Color", ball_fill)
+    ui.SetVisibility(TAB, VIS, "Home Color",      goal_esp)
+    ui.SetVisibility(TAB, VIS, "Away Color",      goal_esp)
+    ui.SetVisibility(TAB, VIS, "Goal ESP Text",   goal_esp)
+    ui.SetVisibility(TAB, VIS, "Goal Fill",       goal_esp)
+    ui.SetVisibility(TAB, VIS, "Home Fill Color", goal_fill)
+    ui.SetVisibility(TAB, VIS, "Away Fill Color", goal_fill)
+end)
+
 -- [Speed logic]
 
 cheat.register("onUpdate", function()
     if not ui.getValue(TAB, SPD, "Speed Enabled") then return end
 
-    local threshold  = ui.getValue(TAB, SPD, "Activation Threshold")
     local multiplier = ui.getValue(TAB, SPD, "Speed Multiplier")
     local smoothing  = ui.getValue(TAB, SPD, "Smoothing")
     local cap        = ui.getValue(TAB, SPD, "Enable Speed Cap")
@@ -216,8 +282,7 @@ cheat.register("onUpdate", function()
 
     local ok, vel = pcall(function() return target.Velocity end)
     if not ok or not vel then return end
-    local speed = vel.Magnitude
-    if speed < threshold then return end
+    if vel.Magnitude < 0.1 then return end
 
     local boosted = vel * multiplier
     if smoothing > 0 then
@@ -232,14 +297,12 @@ cheat.register("onUpdate", function()
 end)
 
 -- [Arc logic]
--- 1.0 = natural physics, 0.0 = completely flat. Scales vel.Y by the arc factor each tick.
--- At 0, also locks Y position since zeroing velocity alone doesn't prevent gravity drift.
 
 local flat_lock_y = nil
 
 cheat.register("onUpdate", function()
-    local arc = ui.getValue(TAB, SPD, "Arc") or 1.0
-    if arc >= 1.0 then flat_lock_y = nil; return end
+    if not ui.getValue(TAB, SPD, "Ball Arc") then flat_lock_y = nil; return end
+    local arc = ui.getValue(TAB, SPD, "Arc Level")
 
     local target = (held_ball and held_ball.Parent and held_ball)
                 or (free_ball and free_ball.Parent and free_ball)
@@ -249,8 +312,7 @@ cheat.register("onUpdate", function()
     if not ok or not vel then return end
 
     local horiz = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
-    local threshold = ui.getValue(TAB, SPD, "Activation Threshold") or 2.0
-    if horiz < threshold then flat_lock_y = nil; return end
+    if horiz < 0.1 then flat_lock_y = nil; return end
 
     pcall(function() target.Velocity = Vector3.new(vel.X, vel.Y * arc, vel.Z) end)
 
@@ -274,67 +336,61 @@ end)
 
 -- [Teleport / Ball Control logic]
 
-local glue_active      = false
-local auto_goal_active = false
-local ptb_phase        = "idle"
-local ptb_return_pos   = nil
-local ptb_dwell_start  = 0
-local ptb_retries      = 0
+local glue_active        = false
+local auto_goal_active   = false
+local ptb_phase          = "idle"
+local ptb_return_pos     = nil
+local ptb_dwell_start    = 0
+local ptb_retries        = 0
+local tween_to_phase     = "at_ball"
+local tween_start_pos    = nil
+local tween_start_time   = 0
+local ret_tween_start    = nil
+local ret_tween_start_time = 0
 
 cheat.register("onUpdate", function()
     if not ui.getValue(TAB, TP, "Teleport Enabled") then
         if ptb_phase == "stealing" then keyboard.Release("e") end
-        glue_active    = false
-        ptb_phase      = "idle"
-        ptb_retries    = 0
-        ptb_return_pos = nil
-        info_tp_status = "Teleport disabled"
+        glue_active        = false
+        ptb_phase          = "idle"
+        ptb_retries        = 0
+        ptb_return_pos     = nil
+        tween_start_pos    = nil
+        ret_tween_start    = nil
+        info_tp_status     = "Teleport disabled"
         return
     end
 
     local hrp = local_char and local_char:FindFirstChild("HumanoidRootPart")
     if not hrp then info_tp_status = "Char not found"; return end
 
-    -- Spam-write origin each frame to beat the inconsistent anticheat teleport. No ball needed.
     if ptb_phase == "returning" then
-        local target_pos = ptb_return_pos
-        for _ = 1, 25 do pcall(function() hrp.Position = target_pos end) end
-        local ok, dist = pcall(function() return (hrp.Position - target_pos).Magnitude end)
-        if (ok and dist < 8) or (now_sec() - ptb_dwell_start > 0.5) then
-            info_tp_status = "Returned"
-            ptb_phase      = "idle"
-            ptb_return_pos = nil
-        else
-            info_tp_status = "Returning..."
-        end
-        return
-    end
-
-    -- The server can snatch the ball back within ~200-300ms, so a single-frame ownership
-    -- check is unreliable. Watch Football in local_char for a stable 400ms window first.
-    if ptb_phase == "confirming" then
-        local retry_on = ui.getValue(TAB, TP, "Retry Snap")
-        local max_r    = ui.getValue(TAB, TP, "Max Retries") or 2
-        if local_char and local_char:FindFirstChild("Football") then
-            if now_sec() - ptb_dwell_start >= 0.4 then
-                ptb_retries     = 0
-                ptb_phase       = "returning"
-                ptb_dwell_start = now_sec()
-                info_tp_status  = "Got ball - returning"
+        local is_tween_ret = ui.getValue(TAB, TP, "Travel Mode") == 1
+        if is_tween_ret and ret_tween_start then
+            local ret_dur  = ui.getValue(TAB, TP, "Return Time (sec)")
+            local elapsed  = now_sec() - ret_tween_start_time
+            local progress = math.min(elapsed / ret_dur, 1.0)
+            local alpha    = 1 - (1 - progress) ^ 3
+            local new_pos  = ret_tween_start:Lerp(ptb_return_pos, alpha)
+            for _ = 1, 25 do pcall(function() hrp.Position = new_pos end) end
+            if progress >= 1.0 then
+                info_tp_status  = "Returned"
+                ptb_phase       = "idle"
+                ptb_return_pos  = nil
+                ret_tween_start = nil
             else
-                info_tp_status = "Confirming..."
+                info_tp_status = string.format("Returning %d%%", math.floor(progress * 100))
             end
         else
-            if retry_on and ptb_retries < max_r then
-                ptb_retries     = ptb_retries + 1
-                ptb_phase       = "at_ball"
-                ptb_dwell_start = now_sec()
-                info_tp_status  = string.format("Lost - retry %d/%d", ptb_retries, max_r)
+            local target_pos = ptb_return_pos
+            for _ = 1, 25 do pcall(function() hrp.Position = target_pos end) end
+            local ok, dist = pcall(function() return (hrp.Position - target_pos).Magnitude end)
+            if (ok and dist < 8) or (now_sec() - ptb_dwell_start > 0.5) then
+                info_tp_status = "Returned"
+                ptb_phase      = "idle"
+                ptb_return_pos = nil
             else
-                ptb_retries     = 0
-                ptb_phase       = "returning"
-                ptb_dwell_start = now_sec()
-                info_tp_status  = "Returning..."
+                info_tp_status = "Returning..."
             end
         end
         return
@@ -343,101 +399,162 @@ cheat.register("onUpdate", function()
     local ball = world_ball or (free_ball and free_ball.Parent and free_ball)
 
     if not ball then
-        if (ptb_phase == "at_ball" or ptb_phase == "stealing") and ptb_return_pos then
+        if (ptb_phase == "at_ball" or ptb_phase == "stealing" or ptb_phase == "tweening") and ptb_return_pos then
             if ptb_phase == "stealing" then keyboard.Release("e") end
-            ptb_retries     = 0
-            ptb_phase       = "returning"
-            ptb_dwell_start = now_sec()
-            info_tp_status  = "Ball lost - returning"
+            ptb_retries          = 0
+            tween_start_pos      = nil
+            ret_tween_start      = hrp.Position
+            ret_tween_start_time = now_sec()
+            ptb_phase            = "returning"
+            ptb_dwell_start      = now_sec()
+            info_tp_status       = "Ball lost - returning"
         else
             info_tp_status = "Ball not found"
         end
         return
     end
 
-    local key_idx  = ui.getValue(TAB, TP, "Teleport Key") or 11
-    local key      = KeyOptions[key_idx + 1] or "z"
     local mode     = ui.getValue(TAB, TP, "TP Mode")
-    local off_fwd  = ui.getValue(TAB, TP, "Offset Forward")
-    local off_up   = ui.getValue(TAB, TP, "Offset Up")
     local dwell    = ui.getValue(TAB, TP, "Dwell Time (sec)")
     local preserve = ui.getValue(TAB, TP, "Preserve Momentum")
-    local clicked  = key_clicked(key)
+    local clicked  = hotkey_clicked("Teleport Key")
 
     if mode == 0 then
         if clicked then
-            local tgt = front_target(hrp, off_fwd, off_up)
+            local tgt       = front_target(hrp)
             local saved_vel = ball.Velocity
-            local dist = (ball.Position - hrp.Position).Magnitude
-            local ok, err = pcall(function()
+            local dist      = (ball.Position - hrp.Position).Magnitude
+            local ok, err   = pcall(function()
                 ball.Position = tgt
                 ball.Velocity = preserve and saved_vel or Vector3.new(0, 0, 0)
             end)
             info_tp_status = ok and ("Pulled " .. string.format("%.0f", dist) .. "st")
                                 or ("TP fail: " .. tostring(err))
         else
-            info_tp_status = "[" .. key .. "] pull ball"
+            info_tp_status = "Pull mode ready"
         end
 
     elseif mode == 1 then
         if clicked then glue_active = not glue_active end
         if glue_active then
             local ok = pcall(function()
-                ball.Position = front_target(hrp, off_fwd, off_up)
+                ball.Position = front_target(hrp)
                 ball.Velocity = Vector3.new(0, 0, 0)
             end)
             info_tp_status = ok and "GLUE ON" or "Glue fail"
         else
-            info_tp_status = "[" .. key .. "] glue ball"
+            info_tp_status = "Glue mode: off"
         end
 
     else
+        local use_tween = ui.getValue(TAB, TP, "Travel Mode") == 1
+
         local is_local_holding = holder_char and local_char and holder_char.Name == local_char.Name
         local enemy_hrp = nil
         if holder_char and holder_char.Parent and not is_local_holding then
             enemy_hrp = holder_char:FindFirstChild("HumanoidRootPart")
         end
 
+        local function ball_approach_target()
+            return ball.Position + Vector3.new(0, OFF_UP, 0)
+        end
+
         if ptb_phase == "idle" then
             if clicked then
-                ptb_return_pos = hrp.Position
-                if enemy_hrp then
-                    local ok, err = pcall(function() hrp.Position = enemy_hrp.Position end)
-                    if ok then
-                        ptb_phase       = "stealing"
-                        ptb_dwell_start = now_sec()
-                        info_tp_status  = "Stealing..."
-                    else
-                        info_tp_status = "Steal fail: " .. tostring(err)
-                        ptb_return_pos = nil
-                    end
+                if is_local_holding then
+                    info_tp_status = "Holding ball"
                 else
-                    local dir = ball.Position - hrp.Position
-                    local tgt = ball.Position + Vector3.new(0, off_up, 0)
-                    if dir.Magnitude > 0.1 then
-                        local flat = Vector3.new(dir.X, 0, dir.Z)
-                        if flat.Magnitude > 0.1 then
-                            tgt = ball.Position - flat.Unit * off_fwd + Vector3.new(0, off_up, 0)
+                    ptb_return_pos = hrp.Position
+                    if enemy_hrp then
+                        if use_tween then
+                            tween_start_pos  = hrp.Position
+                            tween_start_time = now_sec()
+                            tween_to_phase   = "stealing"
+                            ptb_phase        = "tweening"
+                            info_tp_status   = "Moving to enemy..."
+                        else
+                            local ok, err = pcall(function() hrp.Position = enemy_hrp.Position end)
+                            if ok then
+                                ptb_phase       = "stealing"
+                                ptb_dwell_start = now_sec()
+                                info_tp_status  = "Stealing..."
+                            else
+                                info_tp_status = "Steal fail: " .. tostring(err)
+                                ptb_return_pos = nil
+                            end
                         end
-                    end
-                    local ok, err = pcall(function() hrp.Position = tgt end)
-                    if ok then
-                        ptb_phase       = "at_ball"
-                        ptb_dwell_start = now_sec()
-                        ptb_retries     = 0
-                        info_tp_status  = "At ball..."
                     else
-                        info_tp_status = "TP fail: " .. tostring(err)
-                        ptb_return_pos = nil
+                        if use_tween then
+                            tween_start_pos  = hrp.Position
+                            tween_start_time = now_sec()
+                            tween_to_phase   = "at_ball"
+                            ptb_phase        = "tweening"
+                            info_tp_status   = "Moving to ball..."
+                        else
+                            local tgt = ball_approach_target()
+                            local ok, err = pcall(function() hrp.Position = tgt end)
+                            if ok then
+                                ptb_phase       = "at_ball"
+                                ptb_dwell_start = now_sec()
+                                ptb_retries     = 0
+                                info_tp_status  = "At ball..."
+                            else
+                                info_tp_status = "TP fail: " .. tostring(err)
+                                ptb_return_pos = nil
+                            end
+                        end
                     end
                 end
             else
-                if enemy_hrp then
+                if is_local_holding then
+                    info_tp_status = "Holding ball"
+                elseif enemy_hrp then
                     local ok, dist = pcall(function() return (hrp.Position - enemy_hrp.Position).Magnitude end)
-                    info_tp_status = ok and string.format("[%s] steal (%.0fst)", key, dist) or "[" .. key .. "] steal"
+                    info_tp_status = ok and string.format("Steal ready (%.0fst)", dist) or "Steal ready"
                 else
-                    info_tp_status = "[" .. key .. "] snap to ball"
+                    info_tp_status = "To ball: ready"
                 end
+            end
+
+        elseif ptb_phase == "tweening" then
+            local elapsed  = now_sec() - tween_start_time
+            local tw_dur   = ui.getValue(TAB, TP, "Tween Time (sec)")
+            local progress = math.min(elapsed / tw_dur, 1.0)
+            local alpha    = 1 - (1 - progress) ^ 3
+
+            local tgt_pos
+            if tween_to_phase == "stealing" and enemy_hrp and enemy_hrp.Parent then
+                tgt_pos = enemy_hrp.Position
+            elseif ball and ball.Parent then
+                tween_to_phase = "at_ball"
+                tgt_pos = ball_approach_target()
+            else
+                tween_start_pos      = nil
+                ret_tween_start      = hrp.Position
+                ret_tween_start_time = now_sec()
+                ptb_phase            = "returning"
+                ptb_dwell_start      = now_sec()
+                info_tp_status       = "Lost target"
+                return
+            end
+
+            local new_pos = tween_start_pos:Lerp(tgt_pos, alpha)
+            for _ = 1, 25 do pcall(function() hrp.Position = new_pos end) end
+
+            if progress >= 1.0 then
+                tween_start_pos = nil
+                if tween_to_phase == "stealing" then
+                    ptb_phase       = "stealing"
+                    ptb_dwell_start = now_sec()
+                    info_tp_status  = "Stealing..."
+                else
+                    ptb_phase       = "at_ball"
+                    ptb_dwell_start = now_sec()
+                    ptb_retries     = 0
+                    info_tp_status  = "At ball..."
+                end
+            else
+                info_tp_status = string.format("Moving %d%%", math.floor(progress * 100))
             end
 
         elseif ptb_phase == "stealing" then
@@ -445,47 +562,54 @@ cheat.register("onUpdate", function()
                 pcall(function() hrp.Position = enemy_hrp.Position end)
             end
             keyboard.Press("e")
-            local steal_dwell = ui.getValue(TAB, TP, "Steal Dwell (sec)") or 0.6
-            local elapsed = now_sec() - ptb_dwell_start
+            local steal_dwell = ui.getValue(TAB, TP, "Steal Dwell (sec)")
+            local elapsed     = now_sec() - ptb_dwell_start
             if elapsed >= steal_dwell then
                 keyboard.Release("e")
-                ptb_phase       = "returning"
-                ptb_dwell_start = now_sec()
-                info_tp_status  = "Returning..."
+                ret_tween_start      = hrp.Position
+                ret_tween_start_time = now_sec()
+                ptb_phase            = "returning"
+                ptb_dwell_start      = now_sec()
+                info_tp_status       = "Returning..."
             else
                 info_tp_status = string.format("Stealing %.1fs", steal_dwell - elapsed)
             end
 
         elseif ptb_phase == "at_ball" then
             if local_char and local_char:FindFirstChild("Football") then
-                ptb_phase       = "confirming"
-                ptb_dwell_start = now_sec()
-                info_tp_status  = "Confirming..."
+                ptb_retries          = 0
+                ret_tween_start      = hrp.Position
+                ret_tween_start_time = now_sec()
+                ptb_phase            = "returning"
+                ptb_dwell_start      = now_sec()
+                info_tp_status       = "Got ball - returning"
                 return
             end
 
             local elapsed = now_sec() - ptb_dwell_start
             if elapsed >= dwell then
-                local retry_on = ui.getValue(TAB, TP, "Retry Snap")
-                local max_r    = ui.getValue(TAB, TP, "Max Retries") or 2
+                local retry_on = ui.getValue(TAB, TP, "Retry on Miss")
+                local max_r    = ui.getValue(TAB, TP, "Max Retries")
                 if retry_on and ptb_retries < max_r then
-                    local dir = ball.Position - hrp.Position
-                    local tgt = ball.Position + Vector3.new(0, off_up, 0)
-                    if dir.Magnitude > 0.1 then
-                        local flat = Vector3.new(dir.X, 0, dir.Z)
-                        if flat.Magnitude > 0.1 then
-                            tgt = ball.Position - flat.Unit * off_fwd + Vector3.new(0, off_up, 0)
-                        end
+                    ptb_retries = ptb_retries + 1
+                    if use_tween then
+                        tween_start_pos  = hrp.Position
+                        tween_start_time = now_sec()
+                        tween_to_phase   = "at_ball"
+                        ptb_phase        = "tweening"
+                    else
+                        local tgt = ball_approach_target()
+                        pcall(function() hrp.Position = tgt end)
+                        ptb_dwell_start = now_sec()
                     end
-                    pcall(function() hrp.Position = tgt end)
-                    ptb_retries     = ptb_retries + 1
-                    ptb_dwell_start = now_sec()
-                    info_tp_status  = string.format("Retry %d/%d", ptb_retries, max_r)
+                    info_tp_status = string.format("Retry %d/%d", ptb_retries, max_r)
                 else
-                    ptb_retries     = 0
-                    ptb_phase       = "returning"
-                    ptb_dwell_start = now_sec()
-                    info_tp_status  = "Returning..."
+                    ptb_retries          = 0
+                    ret_tween_start      = hrp.Position
+                    ret_tween_start_time = now_sec()
+                    ptb_phase            = "returning"
+                    ptb_dwell_start      = now_sec()
+                    info_tp_status       = "Returning..."
                 end
             else
                 info_tp_status = string.format("At ball %.1fs", dwell - elapsed)
@@ -496,7 +620,6 @@ end)
 
 -- [Visuals paint]
 
--- hull computed once per part; shared by box and fill draws
 local function get_part_hull(part)
     local corners = draw.GetPartCorners(part)
     if not corners then return nil end
@@ -511,7 +634,6 @@ local function get_part_hull(part)
         end
     end
     if n < 2 then return nil end
-    -- pass only the filled slice (ComputeConvexHull reads up to n entries)
     local pts = {}
     for i = 1, n do pts[i] = _screen_buf[i] end
     return draw.ComputeConvexHull(pts)
@@ -541,12 +663,12 @@ cheat.register("onPaint", function()
     if ui.getValue(TAB, VIS, "Info Display") then
         local _sw, sh = cheat.GetWindowSize()
         local x, y = 10, sh - 85
-        local gg_target_idx = ui.getValue(TAB, TP, "Goal Target") or 0
+        local gg_target_idx   = ui.getValue(TAB, TP, "Goal Target")
         local gg_target_names = {"Auto", "Home", "Away"}
         local gg_label = auto_goal_active
-            and ("ON -> " .. (gg_target_names[gg_target_idx + 1] or "?"))
-            or "OFF"
-        draw.TextOutlined("BL:R", x, y, COLOR_YELLOW, font, 255)
+            and ("On -> " .. (gg_target_names[gg_target_idx + 1] or "?"))
+            or "Off"
+        draw.TextOutlined("BL:R", x, y, COLOR_BLUE, font, 255)
         draw.TextOutlined("Speed:  " .. tostring(info_speed) .. " (" .. ball_status .. ")", x, y + 15, COLOR_WHITE, font, 255)
         draw.TextOutlined("Dist:   " .. info_dist,     x, y + 30, COLOR_WHITE, font, 255)
         draw.TextOutlined("TP:     " .. info_tp_status, x, y + 45, COLOR_WHITE, font, 255)
@@ -564,7 +686,7 @@ cheat.register("onPaint", function()
         local is_local_holding = holder_char and local_char and holder_char.Name == local_char.Name
         local ball_part
         if is_local_holding then
-            -- local player has the ball, nothing to display
+            -- local player has the ball
         elseif holder_char and holder_char.Parent then
             ball_part = holder_char:FindFirstChild("Hitbox") or holder_char:FindFirstChild("HumanoidRootPart")
         else
@@ -632,18 +754,13 @@ end)
 
 -- [Auto Goal logic]
 
--- 1=Auto, 2=Home, 3=Away (matches dropdown order)
-local GOAL_TARGETS = {"Auto (enemy)", "Home", "Away"}
-
 cheat.register("onUpdate", function()
     if not ui.getValue(TAB, TP, "Auto Goal") then
         auto_goal_active = false
         return
     end
 
-    local gg_key_idx = ui.getValue(TAB, TP, "Auto Goal Key") or 11
-    local gg_key     = KeyOptions[gg_key_idx + 1] or "g"
-    if key_clicked(gg_key) then
+    if hotkey_clicked("Auto Goal Key") then
         auto_goal_active = not auto_goal_active
     end
 
@@ -654,24 +771,51 @@ cheat.register("onUpdate", function()
               or (free_ball and free_ball.Parent and free_ball)
     if not ball then return end
 
-    local target_idx = ui.getValue(TAB, TP, "Goal Target") or 0
-    local target_name
+    local target_idx = ui.getValue(TAB, TP, "Goal Target")
+
     if target_idx == 0 then
-        local lp = game.LocalPlayer
-        local ok, team = lp and pcall(function() return lp.Team end) or false, nil
-        local my_team = ok and tostring(team) or ""
-        target_name = (my_team == "Home") and "Home" or "Away"
-    else
-        target_name = GOAL_TARGETS[target_idx + 1]
+        local player_team = ""
+        pcall(function()
+            local lp = game.LocalPlayer
+            if lp and lp.Team then player_team = tostring(lp.Team) end
+        end)
+        if player_team == "" then return end
+
+        local goals_f = game.Workspace:FindFirstChild("Goals")
+        if not goals_f then return end
+
+        local goal_parts = {}
+        for _, c in ipairs(goals_f:GetChildren()) do
+            if c.ClassName == "Part" or c.ClassName == "MeshPart" then
+                goal_parts[#goal_parts + 1] = c
+            end
+        end
+
+        local on_team = false
+        for _, g in ipairs(goal_parts) do
+            if g.Name == player_team then on_team = true; break end
+        end
+        if not on_team then return end
+
+        for _, g in ipairs(goal_parts) do
+            if g.Name == player_team then
+                pcall(function()
+                    ball.Position = g.Position
+                    ball.Velocity = Vector3.new(0, 0, 0)
+                end)
+                return
+            end
+        end
+        return
     end
 
-    local goals     = game.Workspace:FindFirstChild("Goals")
-    local goal_part = goals and goals:FindFirstChild(target_name)
+    local target_name = (target_idx == 1) and "Home" or "Away"
+    local goals_f     = game.Workspace:FindFirstChild("Goals")
+    local goal_part   = goals_f and goals_f:FindFirstChild(target_name)
     if not goal_part then return end
 
     local ok, pos = pcall(function() return goal_part.Position end)
     if not ok or not pos then return end
-
     pcall(function()
         ball.Position = pos
         ball.Velocity = Vector3.new(0, 0, 0)
@@ -681,17 +825,19 @@ end)
 -- [Cleanup]
 
 cheat.register("shutdown", function()
-    free_ball        = nil
-    held_ball        = nil
-    world_ball       = nil
-    holder_char      = nil
-    local_char       = nil
-    goal_boxes       = {}
-    glue_active      = false
-    auto_goal_active = false
-    ptb_phase        = "idle"
-    ptb_retries      = 0
-    ptb_return_pos   = nil
-    flat_lock_y      = nil
+    free_ball          = nil
+    held_ball          = nil
+    world_ball         = nil
+    holder_char        = nil
+    local_char         = nil
+    goal_boxes         = {}
+    glue_active        = false
+    auto_goal_active   = false
+    ptb_phase          = "idle"
+    ptb_retries        = 0
+    ptb_return_pos     = nil
+    tween_start_pos    = nil
+    ret_tween_start    = nil
+    flat_lock_y        = nil
     keyboard.Release("e")
 end)
