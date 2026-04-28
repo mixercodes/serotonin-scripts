@@ -20,19 +20,49 @@ end)
 
 ## Development
 
-For editing scripts locally with full autocomplete and type hints.
+### Requirements
 
-### 1. Clone the repo
+- [VS Code](https://code.visualstudio.com/)
+- [luau-lsp](https://marketplace.visualstudio.com/items?itemName=JohnnyMorganz.luau-lsp) extension
+- Git (SSH key configured for GitHub, or use HTTPS)
+
+### Setup
+
+**1. Clone the repo**
 
 ```bash
 git clone git@github.com:mixercodes/serotonin-scripts.git
+cd serotonin-scripts
 ```
 
-### 2. Install luau-lsp (VS Code)
+**2. Open in VS Code**
 
-Install the [luau-lsp](https://marketplace.visualstudio.com/items?itemName=JohnnyMorganz.luau-lsp) extension. The included `.vscode/settings.json` and `.globals/environment.d.luau` wire it up automatically, giving you full autocomplete and type hints for every Serotonin API out of the box.
+```bash
+code .
+```
+
+**3. Install luau-lsp**
+
+Install the [luau-lsp](https://marketplace.visualstudio.com/items?itemName=JohnnyMorganz.luau-lsp) VS Code extension. The repo includes `.vscode/settings.json` and `.globals/environment.d.luau` which wire it up automatically - you get full autocomplete and type hints for every Serotonin global (`game`, `entity`, `draw`, `ui`, etc.) with no extra config.
+
+**4. Edit and push**
+
+Scripts live in the repo root as `.lua` files. Edit, commit, push - the loadstring URLs pull directly from `master` so changes are live immediately.
+
+### Running a script
+
+In Serotonin's Scripting tab, paste the loadstring for the script you want and execute. Each script's loadstring is listed above under Scripts.
+
+### Folder structure
+
+```
+.globals/          - Luau type stubs for luau-lsp autocomplete
+.vscode/           - VS Code workspace settings (luau-lsp config)
+*.lua              - Scripts
+CLAUDE.md          - AI assistant instructions (see below)
+```
 
 ## API reference
 
-- **Community docs**: https://deftsolutions-dev.github.io/serotonin-api-docs/ - hand-audited against a live runtime, covers all 17 libraries with correct signatures and crash flags. Prefer this over the official gitbook.
-- **Official gitbook**: https://serotonin-1.gitbook.io - use as a fallback only, known to have drifted.
+- **Community docs (preferred)**: https://deftsolutions-dev.github.io/serotonin-api-docs/ - hand-audited against a live runtime, covers all 17 libraries with correct signatures and crash flags.
+- **Official gitbook**: https://serotonin-1.gitbook.io - use as fallback only, known to have drifted from the actual runtime.
