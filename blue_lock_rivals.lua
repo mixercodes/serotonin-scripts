@@ -112,20 +112,22 @@ local function refresh_ball_refs()
     free_ball  = ball_model and ball_model:FindFirstChild("RootPart") or nil
     world_ball = game.Workspace:FindFirstChild("Football")
 
-    -- Football always stays in Workspace (never reparented to a character).
-    -- Use OnPlayer/Char values to detect who is holding it.
     held_ball   = nil
     holder_char = nil
-    if world_ball then
-        local op   = world_ball:FindFirstChild("OnPlayer")
-        local char = world_ball:FindFirstChild("Char")
-        if op and op.Value ~= 0 and char and char.Value then
-            held_ball   = world_ball
-            holder_char = char.Value
-            ball_status = (char.Value.Name or "?") .. " (held)"
+    for _, child in ipairs(game.Workspace:GetChildren()) do
+        if child.ClassName == "Model" and child:FindFirstChild("Football") then
+            held_ball   = child:FindFirstChild("Football")
+            holder_char = child
+            ball_status = child.Name .. " (held)"
             return
         end
+    end
+
+    if world_ball then
         local ok, spd = pcall(function() return world_ball.Velocity.Magnitude end)
+        ball_status = (ok and spd or 0) > 0.5 and "ball in motion" or "ball idle"
+    elseif free_ball and free_ball.Parent then
+        local ok, spd = pcall(function() return free_ball.Velocity.Magnitude end)
         ball_status = (ok and spd or 0) > 0.5 and "ball in motion" or "ball idle"
     else
         ball_status = "no ball"
@@ -305,23 +307,17 @@ local info_speed     = 0
 local info_dist      = "--"
 local info_tp_status = "Teleport disabled"
 
--- Returns the effective ball world position: holder's HRP when held, Football.Position when free.
--- Football.Position freezes at pickup point when held, so we must use the holder's HRP instead.
 local function get_ball_pos()
-    if holder_char and holder_char.Parent then
-        local pf = holder_char:FindFirstChild("PlrFootball")
-        if pf then
-            local ok, p = pcall(function() return pf.Position end)
-            if ok and p then return p end
-        end
-        local hrp = holder_char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            local ok, p = pcall(function() return hrp.Position end)
-            if ok and p then return p end
-        end
+    if held_ball and held_ball.Parent then
+        local ok, p = pcall(function() return held_ball.Position end)
+        if ok and p then return p end
     end
     if world_ball and world_ball.Parent then
         local ok, p = pcall(function() return world_ball.Position end)
+        if ok and p then return p end
+    end
+    if free_ball and free_ball.Parent then
+        local ok, p = pcall(function() return free_ball.Position end)
         if ok and p then return p end
     end
     return nil
@@ -607,19 +603,10 @@ cheat.register("onUpdate", function()
     else
         local use_tween = ui.getValue(TAB, TP, "Travel Mode") == 1
 
-        -- live OnPlayer check to avoid 100ms stale cache sending steal to wrong location
-        local live_holder = nil
-        if world_ball then
-            local op = world_ball:FindFirstChild("OnPlayer")
-            local ch = world_ball:FindFirstChild("Char")
-            if op and op.Value ~= 0 and ch and ch.Value then
-                live_holder = ch.Value
-            end
-        end
-        local is_local_holding = live_holder and local_char and live_holder == local_char
+        local is_local_holding = holder_char and local_char and holder_char.Name == local_char.Name
         local enemy_hrp = nil
-        if live_holder and live_holder.Parent and not is_local_holding then
-            enemy_hrp = live_holder:FindFirstChild("HumanoidRootPart")
+        if holder_char and holder_char.Parent and not is_local_holding then
+            enemy_hrp = holder_char:FindFirstChild("HumanoidRootPart")
         end
 
         local function ball_approach_target()
@@ -883,8 +870,8 @@ cheat.register("onPaint", function()
         if is_local_holding then
             -- local player has the ball, skip ESP
         elseif holder_char and holder_char.Parent then
-            -- PlrFootball is the visual ball on the character; falls back to HRP
-            ball_part = holder_char:FindFirstChild("PlrFootball")
+            ball_part = holder_char:FindFirstChild("Football")
+                     or holder_char:FindFirstChild("Hitbox")
                      or holder_char:FindFirstChild("HumanoidRootPart")
         else
             ball_part = world_ball
