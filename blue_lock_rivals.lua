@@ -240,8 +240,8 @@ cheat.register("onUpdate", function()
     ui.SetVisibility(TAB, TP, "Travel Mode",       tp_on and is_ptb)
     ui.SetVisibility(TAB, TP, "Tween Time (sec)",  tp_on and is_tween)
     ui.SetVisibility(TAB, TP, "Return Time (sec)", tp_on and is_tween)
-    ui.SetVisibility(TAB, TP, "Dwell Time (sec)",  tp_on and is_ptb)
-    ui.SetVisibility(TAB, TP, "Steal Dwell (sec)", tp_on and is_ptb)
+    ui.SetVisibility(TAB, TP, "Dwell Time (sec)",  tp_on and is_ptb and not is_tween)
+    ui.SetVisibility(TAB, TP, "Steal Dwell (sec)", tp_on and is_ptb and not is_tween)
     ui.SetVisibility(TAB, TP, "Retry on Miss",     tp_on and is_ptb)
     ui.SetVisibility(TAB, TP, "Max Retries",       tp_on and is_ptb and retry_on)
     ui.SetVisibility(TAB, TP, "Preserve Momentum", tp_on and is_pull)
@@ -345,8 +345,9 @@ local ptb_retries        = 0
 local tween_to_phase     = "at_ball"
 local tween_start_pos    = nil
 local tween_start_time   = 0
-local ret_tween_start    = nil
+local ret_tween_start      = nil
 local ret_tween_start_time = 0
+local ret_use_tween        = false
 
 cheat.register("onUpdate", function()
     if not ui.getValue(TAB, TP, "Teleport Enabled") then
@@ -357,6 +358,7 @@ cheat.register("onUpdate", function()
         ptb_return_pos     = nil
         tween_start_pos    = nil
         ret_tween_start    = nil
+        ret_use_tween      = false
         info_tp_status     = "Teleport disabled"
         return
     end
@@ -365,8 +367,7 @@ cheat.register("onUpdate", function()
     if not hrp then info_tp_status = "Char not found"; return end
 
     if ptb_phase == "returning" then
-        local is_tween_ret = ui.getValue(TAB, TP, "Travel Mode") == 1
-        if is_tween_ret and ret_tween_start then
+        if ret_use_tween and ret_tween_start then
             local ret_dur  = ui.getValue(TAB, TP, "Return Time (sec)")
             local elapsed  = now_sec() - ret_tween_start_time
             local progress = math.min(elapsed / ret_dur, 1.0)
@@ -403,6 +404,7 @@ cheat.register("onUpdate", function()
             if ptb_phase == "stealing" then keyboard.Release("e") end
             ptb_retries          = 0
             tween_start_pos      = nil
+            ret_use_tween        = ui.getValue(TAB, TP, "Travel Mode") == 1
             ret_tween_start      = hrp.Position
             ret_tween_start_time = now_sec()
             ptb_phase            = "returning"
@@ -530,6 +532,7 @@ cheat.register("onUpdate", function()
                 tgt_pos = ball_approach_target()
             else
                 tween_start_pos      = nil
+                ret_use_tween        = use_tween
                 ret_tween_start      = hrp.Position
                 ret_tween_start_time = now_sec()
                 ptb_phase            = "returning"
@@ -566,6 +569,7 @@ cheat.register("onUpdate", function()
             local elapsed     = now_sec() - ptb_dwell_start
             if elapsed >= steal_dwell then
                 keyboard.Release("e")
+                ret_use_tween        = use_tween
                 ret_tween_start      = hrp.Position
                 ret_tween_start_time = now_sec()
                 ptb_phase            = "returning"
@@ -578,6 +582,7 @@ cheat.register("onUpdate", function()
         elseif ptb_phase == "at_ball" then
             if local_char and local_char:FindFirstChild("Football") then
                 ptb_retries          = 0
+                ret_use_tween        = use_tween
                 ret_tween_start      = hrp.Position
                 ret_tween_start_time = now_sec()
                 ptb_phase            = "returning"
@@ -587,7 +592,7 @@ cheat.register("onUpdate", function()
             end
 
             local elapsed = now_sec() - ptb_dwell_start
-            if elapsed >= dwell then
+            if use_tween or elapsed >= dwell then
                 local retry_on = ui.getValue(TAB, TP, "Retry on Miss")
                 local max_r    = ui.getValue(TAB, TP, "Max Retries")
                 if retry_on and ptb_retries < max_r then
@@ -605,6 +610,7 @@ cheat.register("onUpdate", function()
                     info_tp_status = string.format("Retry %d/%d", ptb_retries, max_r)
                 else
                     ptb_retries          = 0
+                    ret_use_tween        = use_tween
                     ret_tween_start      = hrp.Position
                     ret_tween_start_time = now_sec()
                     ptb_phase            = "returning"
@@ -838,6 +844,7 @@ cheat.register("shutdown", function()
     ptb_return_pos     = nil
     tween_start_pos    = nil
     ret_tween_start    = nil
+    ret_use_tween      = false
     flat_lock_y        = nil
     keyboard.Release("e")
 end)
