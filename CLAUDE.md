@@ -170,7 +170,7 @@ These behaviors have been confirmed in production scripts:
 - `loadstring(str)()` works for dynamic code execution
 - `ui.NewColorpicker(... inLine=true)` attaches to the **immediately preceding widget in declaration order** — declare each colorpicker directly after its paired widget, not at the end of the block
 - **Checkbox + colorpicker pairs are lumped**: any checkbox (or dropdown) that gates a visual element is immediately followed by its colorpicker with `inLine=true`. This is the standard layout across Serotonin scripts and is how users expect the UI to read — do not group all pickers at the bottom.
-- **Hotkeys use `ui.newHotkey(tab, container, label, true)`**: the `true` 4th arg is `inLine` — attaches the widget inline on the same row as its preceding checkbox, exactly as JJS.lua does (production-verified). Declare it directly after its paired checkbox; a hotkey not paired with a checkbox may render incorrectly.
+- **Hotkeys use `ui.newHotkey(tab, container, label, true)`**: the `true` 4th arg is `inLine` — attaches the widget inline on the same row as its preceding checkbox (runtime-verified). Declare it directly after its paired checkbox; a hotkey not paired with a checkbox may render incorrectly.
   - `ui.getValue(tab, container, label)` → `bool` (true while the bound key is held). For a simple held-state gate: `if ui.getValue(...) ~= true then return end`
   - For single-press / toggle triggers, use edge detection:
     ```lua
@@ -197,7 +197,7 @@ Game data (team names, instance names, folder structure, object positions) can c
 
 ## Before Writing Any Script
 
-**Always ask the user first:** "Do you have an existing utility/library for this?" before implementing from scratch. Production scripts often already have working implementations (TweenService, scheduler, input helpers, etc.). Building on top of a known-working base is always preferable to reinventing it.
+**Always ask the user first:** "Do you have an existing utility/library for this?" before implementing from scratch. Building on top of a known-working base is always preferable to reinventing it.
 
 **For movement/physics scripts — `instance.Position = value` is the correct mechanism.** Do not reach for `Velocity` writes or memory writes for movement. Instant teleport (a single position write) works fine in most games and is the default unless the user asks for smooth movement.
 
@@ -223,7 +223,7 @@ Never wait for the user to provide a tween implementation — the above pattern 
 - Cache aggressively: text sizes, rotation matrices, part corners, memory reads
 - Chunk heavy processing across frames to avoid drops
 
-## Performance Patterns from Production Scripts
+## Performance Patterns
 
 - Pre-allocate tables and reuse buffers instead of creating new ones each frame
 - Time-based cache invalidation for rotation matrices and transforms
