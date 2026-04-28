@@ -115,9 +115,8 @@ Tools (all prefixed `serotonin_`):
 - `entity.GetPlayers()` returns userdata (not indices as older docs claim). Access fields as `p.Name`, call bone methods as `p:GetBonePosition("HumanoidRootPart")`.
 - `entity.Position` is often stale (stays at `(0,0,0)` in FFA modes). Use `p:GetBonePosition("HumanoidRootPart")` for the live value.
 - Valid `memory.Read` / `memory.Write` types: see `MemoryType` in `.globals/environment.d.luau`.
-- **Bridge observations are only valid for the current game state.** Lobby and in-match states differ significantly — instance structure, parenting, and value semantics can all change. Never draw conclusions from bridge data collected outside the game state you are debugging.
-- **In Blue Lock: Rivals, `Football` is reparented into the holder's character `Model` during a match when a player holds the ball.** Detecting the holder means scanning `workspace:GetChildren()` for a `Model` containing a `Football` child — do not replace this with `OnPlayer`/`Char` ObjectValue checks, which only reflect lobby-state structure.
-- **Roblox `BoolValue.Value` may be exposed as a number (0/1) rather than a boolean in Serotonin's sandbox.** Always verify the Lua `type()` of a value before writing comparisons — `op.Value == true` will silently always be false if the value is numeric.
+- **Bridge observations are only valid for the current game state.** Never draw conclusions from bridge data collected outside the game state being debugged — instance structure and value semantics can differ significantly between states.
+- **Always verify the Lua `type()` of a value before writing comparisons against it.** A `BoolValue.Value` may be exposed as a number in Serotonin's sandbox — `op.Value == true` silently fails if the value is numeric.
 
 ## Documentation
 
