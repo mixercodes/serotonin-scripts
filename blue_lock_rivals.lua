@@ -471,6 +471,7 @@ local ptb_retries        = 0
 local ptb_start_time     = 0
 local tween_to_phase     = "at_ball"
 local tween_start_pos    = nil
+local tween_end_pos      = nil
 local tween_start_time   = 0
 local ret_tween_start      = nil
 local ret_tween_start_time = 0
@@ -486,6 +487,7 @@ cheat.register("onUpdate", function()
         ptb_retries        = 0
         ptb_return_pos     = nil
         tween_start_pos    = nil
+        tween_end_pos      = nil
         ret_tween_start    = nil
         ret_use_tween      = false
         info_tp_status     = "Teleport disabled"
@@ -533,6 +535,7 @@ cheat.register("onUpdate", function()
             if ptb_phase == "stealing" then keyboard.Release("e") end
             ptb_retries          = 0
             tween_start_pos      = nil
+            tween_end_pos        = nil
             ret_use_tween        = ui.getValue(TAB, TP, "Travel Mode") == 1
             ret_tween_start      = hrp.Position
             ret_tween_start_time = now_sec()
@@ -604,6 +607,7 @@ cheat.register("onUpdate", function()
                     if enemy_hrp then
                         if use_tween then
                             tween_start_pos  = hrp.Position
+                            tween_end_pos    = enemy_hrp.Position
                             tween_start_time = now_sec()
                             tween_to_phase   = "stealing"
                             ptb_phase        = "tweening"
@@ -622,6 +626,7 @@ cheat.register("onUpdate", function()
                     else
                         if use_tween then
                             tween_start_pos  = hrp.Position
+                            tween_end_pos    = ball_approach_target()
                             tween_start_time = now_sec()
                             tween_to_phase   = "at_ball"
                             ptb_phase        = "tweening"
@@ -657,6 +662,7 @@ cheat.register("onUpdate", function()
                 if ptb_phase == "stealing" then keyboard.Release("e") end
                 ptb_retries          = 0
                 tween_start_pos      = nil
+                tween_end_pos        = nil
                 ret_use_tween        = use_tween
                 ret_tween_start      = hrp.Position
                 ret_tween_start_time = now_sec()
@@ -672,14 +678,9 @@ cheat.register("onUpdate", function()
             local progress = math.min(elapsed / tw_dur, 1.0)
             local alpha    = 1 - (1 - progress) ^ 3
 
-            local tgt_pos
-            if tween_to_phase == "stealing" and enemy_hrp and enemy_hrp.Parent then
-                tgt_pos = enemy_hrp.Position
-            elseif ball and ball.Parent then
-                tween_to_phase = "at_ball"
-                tgt_pos = ball_approach_target()
-            else
+            if not tween_end_pos or not tween_start_pos then
                 tween_start_pos      = nil
+                tween_end_pos        = nil
                 ret_use_tween        = use_tween
                 ret_tween_start      = hrp.Position
                 ret_tween_start_time = now_sec()
@@ -689,11 +690,12 @@ cheat.register("onUpdate", function()
                 return
             end
 
-            local new_pos = tween_start_pos:Lerp(tgt_pos, alpha)
+            local new_pos = tween_start_pos:Lerp(tween_end_pos, alpha)
             for _ = 1, 25 do pcall(function() hrp.Position = new_pos end) end
 
             if progress >= 1.0 then
                 tween_start_pos = nil
+                tween_end_pos   = nil
                 if tween_to_phase == "stealing" then
                     ptb_phase       = "stealing"
                     ptb_dwell_start = now_sec()
@@ -750,6 +752,7 @@ cheat.register("onUpdate", function()
                     ptb_retries = ptb_retries + 1
                     if use_tween then
                         tween_start_pos  = hrp.Position
+                        tween_end_pos    = ball_approach_target()
                         tween_start_time = now_sec()
                         tween_to_phase   = "at_ball"
                         ptb_phase        = "tweening"
@@ -1002,6 +1005,7 @@ cheat.register("shutdown", function()
     ptb_retries        = 0
     ptb_return_pos     = nil
     tween_start_pos    = nil
+    tween_end_pos      = nil
     ret_tween_start    = nil
     ret_use_tween      = false
     flat_lock_y        = nil
