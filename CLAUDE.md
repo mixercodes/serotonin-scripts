@@ -35,10 +35,6 @@ Claude will pick up CLAUDE.md automatically. For bridge-assisted script writing,
 
 Never guess Serotonin API signatures. Before writing any API call, look it up via `mcp__serotonin-docs__get_function` or `mcp__serotonin-docs__search_pages`. Serotonin's API regularly differs from Roblox executor conventions, standard Lua, and other scripting platforms.
 
-## Writing Style
-
-Never use em-dashes (--) in README files or any content pushed to GitHub. Use regular hyphens, commas, or rewrite the sentence instead.
-
 ## Maintenance Rules
 
 CLAUDE.md is for: workflow, conventions, runtime corrections to stubs, and things no other file captures.
