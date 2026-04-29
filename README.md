@@ -6,6 +6,30 @@ Personal scripts for the [Serotonin](https://serotonin-1.gitbook.io) Lua scripti
 
 Paste the loadstring into Serotonin's script editor (and then execute) to run a script.
 
+### ball_manipulation.lua
+
+Camera-relative ball control (WASD + Space/Shift) and orbit mode (ball circles the player). Works in any game with a Football instance.
+
+```lua
+http.Get("https://raw.githubusercontent.com/mixercodes/serotonin-scripts/master/ball_manipulation.lua", {}, function(body)
+    loadstring(body)()
+end)
+```
+
+---
+
+### compass.lua
+
+HUD compass showing N/S/E/W labels at the top of the screen, derived from live camera projection. The cardinal you're facing highlights in yellow.
+
+```lua
+http.Get("https://raw.githubusercontent.com/mixercodes/serotonin-scripts/master/compass.lua", {}, function(body)
+    loadstring(body)()
+end)
+```
+
+---
+
 ### blue_lock_rivals.lua - Blue Lock: Rivals
 
 Ball physics manipulation (speed multiplier, flat path), ball teleport modes (pull, glue, auto steal), and ESP/on-screen visuals for the ball and players.
