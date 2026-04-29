@@ -31,7 +31,7 @@ ui.newSliderFloat(TAB, BC, "Move Speed", 1.0, 100.0)
 ui.NewCheckbox(TAB, BC, "Freeze Player")
 
 ui.setValue(TAB, BC, "BC Enabled",    false)
-ui.setValue(TAB, BC, "Move Speed",    2.0)
+ui.setValue(TAB, BC, "Move Speed",    15.0)
 ui.setValue(TAB, BC, "Freeze Player", true)
 
 -- State
