@@ -6,9 +6,9 @@ Personal scripts for the [Serotonin](https://serotonin-1.gitbook.io) Lua scripti
 
 Paste the loadstring into Serotonin's script editor (and then execute) to run a script.
 
-### ball_manipulation.lua
+### ball_manipulation.lua - Blue Lock: Rivals
 
-Camera-relative ball control (WASD + Space/Shift) and orbit mode (ball circles the player). Works in any game with a Football instance.
+Camera-relative ball control (WASD + Space/Shift) and orbit mode (ball circles the player).
 
 ```lua
 http.Get("https://raw.githubusercontent.com/mixercodes/serotonin-scripts/master/ball_manipulation.lua", {}, function(body)
