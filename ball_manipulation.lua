@@ -20,7 +20,7 @@ ui.newSliderFloat(TAB, CIRC, "Speed (rps)", 0.1, 10.0)
 
 ui.setValue(TAB, CIRC, "Orbit Enabled", false)
 ui.setValue(TAB, CIRC, "Radius",        3.5)
-ui.setValue(TAB, CIRC, "Height",        1.0)
+ui.setValue(TAB, CIRC, "Height",        10.0)
 ui.setValue(TAB, CIRC, "Speed (rps)",   0.5)
 
 -- Ball Control container
