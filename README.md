@@ -30,6 +30,18 @@ end)
 
 ---
 
+### localplayer_esp.lua
+
+Local player HUD: bounding box with optional fill and outline, health bar (color-shifts green→red), optional health text, optional health at cursor. All colors customizable. Config save/load/reset.
+
+```lua
+http.Get("https://raw.githubusercontent.com/mixercodes/serotonin-scripts/master/localplayer_esp.lua", {}, function(body)
+    loadstring(body)()
+end)
+```
+
+---
+
 ### blue_lock_rivals.lua - Blue Lock: Rivals
 
 Ball physics manipulation (speed multiplier, flat path), ball teleport modes (pull, glue, auto steal), and ESP/on-screen visuals for the ball and players.

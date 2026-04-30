@@ -172,6 +172,7 @@ These behaviors have been confirmed in production scripts:
 - `loadstring(str)()` works for dynamic code execution
 - `ui.NewColorpicker(... inLine=true)` attaches to the **immediately preceding widget in declaration order** — declare each colorpicker directly after its paired widget, not at the end of the block
 - **Checkbox + colorpicker pairs are lumped**: any checkbox (or dropdown) that gates a visual element is immediately followed by its colorpicker with `inLine=true`. This is the standard layout across Serotonin scripts and is how users expect the UI to read — do not group all pickers at the bottom.
+- **Multiple colorpickers can be chained inline**: you can place as many `inLine=true` colorpickers in a row as needed — each attaches inline after the previous widget. Use this when a feature naturally has multiple related colors (e.g. a gradient's high and low colors both sit under their parent checkbox). Group pickers by what they control, not by widget type.
 - **Hotkeys use `ui.newHotkey(tab, container, label, true)`**: the `true` 4th arg is `inLine` — attaches the widget inline on the same row as its preceding checkbox (runtime-verified). Declare it directly after its paired checkbox; a hotkey not paired with a checkbox may render incorrectly.
   - `ui.getValue(tab, container, label)` → `bool` (true while the bound key is held). For a simple held-state gate: `if ui.getValue(...) ~= true then return end`
   - For single-press / toggle triggers, use edge detection:
