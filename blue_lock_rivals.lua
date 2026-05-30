@@ -218,6 +218,7 @@ local shape_last      = utility.GetTickCount()
 local shape_breathe_t = 0.0
 
 local trail_positions = {}
+local _trail_last_t   = 0
 
 local hk_prev = {}
 
@@ -1614,11 +1615,15 @@ cheat.register("onPaint", function()
         end
     end
 
-    -- Trail accumulation (uses live_ball_center so it tracks correctly even when held)
+    -- Trail accumulation throttled to ~33ms so point spacing is frame-rate independent
     if ui.getValue(TAB, VIS, "Ball Trail") then
-        if live_ball_center then
-            trail_positions[#trail_positions + 1] = live_ball_center
-            if #trail_positions > 60 then table.remove(trail_positions, 1) end
+        local trail_now = utility.GetTickCount()
+        if trail_now - _trail_last_t >= 33 then
+            _trail_last_t = trail_now
+            if live_ball_center then
+                trail_positions[#trail_positions + 1] = live_ball_center
+                if #trail_positions > 60 then table.remove(trail_positions, 1) end
+            end
         end
     elseif #trail_positions > 0 then
         trail_positions = {}
