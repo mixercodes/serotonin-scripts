@@ -1,6 +1,6 @@
 -- blue_lock_rivals.lua (merged with ball_manipulation)
 
-local TP_MODES     = {"Ball to Player (pull)", "Ball Control (glue)", "Player to Ball"}
+local TP_MODES     = {"Ball to Player", "Player to Ball"}
 local TRAVEL_MODES = {"Instant", "Tween"}
 local VIS_FONTS    = {"SmallestPixel", "Verdana", "ConsolasBold", "Tahoma"}
 
@@ -59,7 +59,6 @@ ui.newSliderFloat(TAB, FEAT, "Dwell Time (sec)",  0.0,  5.0)
 ui.newSliderFloat(TAB, FEAT, "Steal Dwell (sec)", 0.1,  5.0)
 ui.NewCheckbox(TAB, FEAT, "Retry on Miss")
 ui.NewSliderInt(TAB, FEAT, "Max Retries", 1, 10)
-ui.NewCheckbox(TAB, FEAT, "Preserve Momentum")
 ui.NewCheckbox(TAB, FEAT, "Auto Goal")
 ui.newHotkey(TAB, FEAT, "Auto Goal Key", true)
 ui.newDropdown(TAB, FEAT, "Goal Target", {"Auto (enemy)", "Home", "Away"})
@@ -134,7 +133,7 @@ ui.setValue(TAB, FEAT, "Max Speed Cap",     150.0)
 ui.setValue(TAB, FEAT, "Ball Arc",          false)
 ui.setValue(TAB, FEAT, "Arc Level",         0.5)
 ui.setValue(TAB, FEAT, "Teleport Enabled",  false)
-ui.setValue(TAB, FEAT, "TP Mode",           2)
+ui.setValue(TAB, FEAT, "TP Mode",           1)
 ui.setValue(TAB, FEAT, "Travel Mode",       1)
 ui.setValue(TAB, FEAT, "Tween Time (sec)",  0.05)
 ui.setValue(TAB, FEAT, "Return Time (sec)", 0.05)
@@ -142,7 +141,6 @@ ui.setValue(TAB, FEAT, "Dwell Time (sec)",  0.3)
 ui.setValue(TAB, FEAT, "Steal Dwell (sec)", 0.6)
 ui.setValue(TAB, FEAT, "Retry on Miss",     false)
 ui.setValue(TAB, FEAT, "Max Retries",       3)
-ui.setValue(TAB, FEAT, "Preserve Momentum", true)
 ui.setValue(TAB, FEAT, "Auto Goal",         false)
 ui.setValue(TAB, FEAT, "Goal Target",       0)
 
@@ -523,7 +521,7 @@ local SAVE_WIDGETS = {
     {FEAT, "Steal Dwell (sec)","val"},
     {FEAT, "Retry on Miss",    "val"},
     {FEAT, "Max Retries",      "val"},
-    {FEAT, "Preserve Momentum","val"},
+
     {FEAT, "Auto Goal",        "val"},
     {FEAT, "Auto Goal Key",    "hk"},
     {FEAT, "Goal Target",      "val"},
@@ -724,10 +722,9 @@ end)
 -- [Update: conditional visibility]
 
 cheat.register("onUpdate", function()
-    local tp_on   = ui.getValue(TAB, FEAT, "Teleport Enabled")
-    local mode    = ui.getValue(TAB, FEAT, "TP Mode")
-    local is_pull = mode == 0
-    local is_ptb  = mode == 2
+    local tp_on  = ui.getValue(TAB, FEAT, "Teleport Enabled")
+    local mode   = ui.getValue(TAB, FEAT, "TP Mode")
+    local is_ptb = mode == 1
     local is_tween  = is_ptb and ui.getValue(TAB, FEAT, "Travel Mode") == 1
     local retry_on  = is_ptb and ui.getValue(TAB, FEAT, "Retry on Miss")
     local auto_g    = tp_on and ui.getValue(TAB, FEAT, "Auto Goal")
@@ -749,7 +746,6 @@ cheat.register("onUpdate", function()
     ui.SetVisibility(TAB, FEAT, "Steal Dwell (sec)",  tp_on and is_ptb)
     ui.SetVisibility(TAB, FEAT, "Retry on Miss",      tp_on and is_ptb)
     ui.SetVisibility(TAB, FEAT, "Max Retries",        tp_on and is_ptb and retry_on)
-    ui.SetVisibility(TAB, FEAT, "Preserve Momentum",  tp_on and is_pull)
     ui.SetVisibility(TAB, FEAT, "Auto Goal",          tp_on)
     ui.SetVisibility(TAB, FEAT, "Goal Target",        auto_g)
 
@@ -1074,29 +1070,11 @@ cheat.register("onUpdate", function()
     end
 
     local mode     = ui.getValue(TAB, FEAT, "TP Mode")
-    local dwell    = ui.getValue(TAB, FEAT, "Dwell Time (sec)")
-    local preserve = ui.getValue(TAB, FEAT, "Preserve Momentum")
-    local clicked  = hotkey_clicked("Teleport Key", FEAT)
+    local dwell   = ui.getValue(TAB, FEAT, "Dwell Time (sec)")
+    local clicked = hotkey_clicked("Teleport Key", FEAT)
 
     if mode == 0 then
-        if clicked then
-            local tgt       = front_target(hrp)
-            local saved_vel = ball.Velocity
-            local dist      = (ball.Position - hrp.Position).Magnitude
-            local ok, err   = pcall(function()
-                ball.Position = tgt
-                ball.Velocity = preserve and saved_vel or Vector3.new(0, 0, 0)
-            end)
-            if ok then
-                set_tp_status("Pulled " .. string.format("%.0f", dist) .. "st", true)
-            else
-                set_tp_status("Pull fail", false)
-            end
-        else
-            set_tp_status("Pull ready", true)
-        end
-
-    elseif mode == 1 then
+        -- Ball to Player: continuous glue
         if hotkey_is_hold("Teleport Key", FEAT) then
             glue_active = ui.getValue(TAB, FEAT, "Teleport Key") == true
         elseif clicked then
@@ -1107,9 +1085,9 @@ cheat.register("onUpdate", function()
                 ball.Position = front_target(hrp)
                 ball.Velocity = Vector3.new(0, 0, 0)
             end)
-            set_tp_status(ok and "Glue: on" or "Glue fail", ok and true or false)
+            set_tp_status(ok and "Ball to Player: on" or "Ball to Player fail", ok and true or false)
         else
-            set_tp_status("Glue: off (ready)", nil)
+            set_tp_status("Ball to Player: off (ready)", nil)
         end
 
     else
