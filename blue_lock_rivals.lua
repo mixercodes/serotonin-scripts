@@ -68,6 +68,9 @@ ui.newDropdown(TAB, FEAT, "Goal Target", {"Auto (enemy)", "Home", "Away"})
 ui.NewContainer(TAB, VIS, "Visuals", { autosize = true, next = true })
 ui.newDropdown(TAB, VIS, "Font", VIS_FONTS)
 ui.NewCheckbox(TAB, VIS, "Info Display")
+ui.NewCheckbox(TAB, VIS, "Show Speed")
+ui.NewCheckbox(TAB, VIS, "Show Distance")
+ui.NewCheckbox(TAB, VIS, "Show GK Status")
 ui.NewCheckbox(TAB, VIS, "Ball ESP")
 ui.NewCheckbox(TAB, VIS, "Box")
 ui.NewColorpicker(TAB, VIS, "Ball Color",      {r=255, g=255, b=255, a=255}, true)
@@ -145,6 +148,9 @@ ui.setValue(TAB, FEAT, "Goal Target",       0)
 
 ui.setValue(TAB, VIS, "Font",          1)
 ui.setValue(TAB, VIS, "Info Display",  true)
+ui.setValue(TAB, VIS, "Show Speed",    true)
+ui.setValue(TAB, VIS, "Show Distance", true)
+ui.setValue(TAB, VIS, "Show GK Status", true)
 ui.setValue(TAB, VIS, "Ball ESP",      false)
 ui.setValue(TAB, VIS, "Box",           false)
 ui.setValue(TAB, VIS, "Ball Fill",     false)
@@ -778,6 +784,11 @@ cheat.register("onUpdate", function()
     ui.SetVisibility(TAB, VIS, "Snap Color",      snap_on)
     ui.SetVisibility(TAB, VIS, "Trail Color",     trail_on)
     ui.SetVisibility(TAB, VIS, "Trail Length",    trail_on)
+
+    local info_on = ui.getValue(TAB, VIS, "Info Display")
+    ui.SetVisibility(TAB, VIS, "Show Speed",    info_on)
+    ui.SetVisibility(TAB, VIS, "Show Distance", info_on)
+    ui.SetVisibility(TAB, VIS, "Show GK Status", info_on)
 
     local dribble_on = ui.getValue(TAB, MAN, "Auto Dribble")
     local linger_on  = dribble_on and ui.getValue(TAB, MAN, "Linger")
@@ -1599,14 +1610,19 @@ cheat.register("onPaint", function()
         end
 
         add("BL:R", COLOR_BLUE)
-        local display_status = local_has_ball and "You (held)" or ball_status
-        add(tostring(info_speed) .. " st/s  " .. display_status)
-        add("Dist  " .. info_dist)
-
-        for _, gk in ipairs(player_gks) do
-            local zone_str = gk.in_penalty and "in box" or "OUT of box"
-            local zone_col = gk.in_penalty and COLOR_YELLOW or COLOR_GREEN
-            add("GK " .. gk.name .. "  " .. zone_str, zone_col)
+        if ui.getValue(TAB, VIS, "Show Speed") then
+            local display_status = local_has_ball and "You (held)" or ball_status
+            add(tostring(info_speed) .. " st/s  " .. display_status)
+        end
+        if ui.getValue(TAB, VIS, "Show Distance") then
+            add("Dist  " .. info_dist)
+        end
+        if ui.getValue(TAB, VIS, "Show GK Status") then
+            for _, gk in ipairs(player_gks) do
+                local zone_str = gk.in_penalty and "in box" or "OUT of box"
+                local zone_col = gk.in_penalty and COLOR_YELLOW or COLOR_GREEN
+                add("GK " .. gk.name .. "  " .. zone_str, zone_col)
+            end
         end
 
         if ui.getValue(TAB, FEAT, "Teleport Enabled") then
