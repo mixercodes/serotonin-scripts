@@ -1946,10 +1946,10 @@ cheat.register("onPaint", function()
                     draw.Polyline(pts, shape_color, true, thickness, shape_alpha)
 
                 elseif shape_idx == 2 then
-                    -- Pentagon
+                    -- Pentagon (top vertex up, flat face at bottom)
                     local pts = {}
                     for i = 0, 4 do
-                        local a = shape_angle + i * (pi2 / 5)
+                        local a = shape_angle - pi * 0.5 + i * (pi2 / 5)
                         pts[i + 1] = {bsx + cos(a) * size, bsy + sin(a) * size}
                     end
                     if fill_on then draw.ConvexPolyFilled(pts, fill_color, fill_alpha) end
