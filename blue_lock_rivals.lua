@@ -645,7 +645,7 @@ cheat.register("onUpdate", function()
     refresh_ball_refs()
     refresh_local_char()
 
-    -- refresh real-player GK list
+    -- refresh GK list (real players + AI)
     player_gks = {}
     local ok_pgk, all_pl = pcall(function() return entity.GetPlayers(false) end)
     if ok_pgk and all_pl then
@@ -661,7 +661,21 @@ cheat.register("onUpdate", function()
             if ok2 and is_gk then
                 local lp = game.LocalPlayer
                 local display_name = (lp and p.Name == lp.Name) and "You" or p.Name
-                player_gks[#player_gks + 1] = {name = display_name, in_penalty = in_pen}
+                player_gks[#player_gks + 1] = {name = display_name, in_penalty = in_pen, is_ai = false}
+            end
+        end
+    end
+    local ai_folder = game.Workspace:FindFirstChild("AI")
+    if ai_folder then
+        for _, team_folder in ipairs(ai_folder:GetChildren()) do
+            local gk_model = team_folder:FindFirstChild("GK")
+            if gk_model then
+                local ok3, in_pen = pcall(function()
+                    local vals = gk_model:FindFirstChild("Values")
+                    local in_p = vals and vals:FindFirstChild("IsInPenalty")
+                    return in_p and (in_p.Value == true or in_p.Value == 1)
+                end)
+                player_gks[#player_gks + 1] = {name = team_folder.Name, in_penalty = ok3 and in_pen, is_ai = true}
             end
         end
     end
@@ -1699,7 +1713,8 @@ cheat.register("onPaint", function()
             for _, gk in ipairs(player_gks) do
                 local zone_str = gk.in_penalty and "in box" or "OUT of box"
                 local zone_col = gk.in_penalty and COLOR_YELLOW or COLOR_GREEN
-                add("GK " .. gk.name .. "  " .. zone_str, zone_col)
+                local tag = gk.is_ai and " [AI]" or ""
+                add("GK " .. gk.name .. tag .. "  " .. zone_str, zone_col)
             end
         end
 
