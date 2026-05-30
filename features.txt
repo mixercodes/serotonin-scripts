@@ -1,0 +1,44 @@
+## Features
+
+[ + ] Ball ESP
+- Box
+- Box Fill
+- Label (holder name / distance)
+- Shape Overlay (Star of David, Hexagon, Circle)
+  - Spin
+  - Breathe
+  - Fill
+  - Thickness
+
+[ + ] Goal ESP
+- Home & Away box
+- Home & Away fill
+- Label (anchored to bounding box)
+
+[ + ] Ball Indicators
+- Off-screen ball indicator
+- Velocity arrow
+- Snap line
+- Ball trail
+
+[ + ] ESP Outlines
+- Per-element black stroke (Box, Shape, Goal, Indicator, Arrow, Snap, Trail)
+
+[ + ] Ball Manipulation
+- Orbit (radius, height, speed)
+- Ball control (WASD, player freeze)
+- Auto dribble (proximity-triggered Q press, configurable radius)
+
+[ + ] Ball Features
+- Speed multiplier (smoothing, cap)
+- Ball arc
+- Teleport
+  - Pull (ball to player)
+  - Glue (ball follows player)
+  - Player to ball (tween, dwell, retry, steal)
+  - Auto goal
+
+[ + ] Config
+- Save, load, delete
+
+I'll post more updates, one day. Drop suggestions on what I should add next
