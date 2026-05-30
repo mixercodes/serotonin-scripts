@@ -194,9 +194,12 @@ local ball_status = "---"
 local goal_boxes  = {}
 local player_gks  = {}  -- {name, in_penalty} for each real-player GK this tick
 
-local COLOR_WHITE = Color3.new(1, 1, 1)
-local COLOR_BLUE  = Color3.fromHex("#3E79A7")
-local COLOR_BLACK = Color3.new(0, 0, 0)
+local COLOR_WHITE  = Color3.new(1, 1, 1)
+local COLOR_BLUE   = Color3.fromHex("#3E79A7")
+local COLOR_BLACK  = Color3.new(0, 0, 0)
+local COLOR_GREEN  = Color3.fromRGB(80, 255, 80)
+local COLOR_RED    = Color3.fromRGB(255, 80, 80)
+local COLOR_YELLOW = Color3.fromRGB(255, 220, 50)
 local _screen_buf = {}
 
 local orbit_active = false
@@ -221,6 +224,7 @@ local hk_prev = {}
 local info_speed     = 0
 local info_dist      = "--"
 local info_tp_status = "Teleport disabled"
+local info_tp_color  = COLOR_YELLOW
 
 local flat_lock_y  = nil
 local speed_active = false
@@ -274,6 +278,15 @@ end
 
 local function now_sec()
     return utility.GetTickCount() / 1000
+end
+
+-- ok=true → green (can fire), ok=false → red (blocked), ok=nil → yellow (neutral)
+local function set_tp_status(msg, ok)
+    info_tp_status = msg
+    if ok == true  then info_tp_color = COLOR_GREEN
+    elseif ok == false then info_tp_color = COLOR_RED
+    else info_tp_color = COLOR_YELLOW
+    end
 end
 
 local function front_target(hrp)
@@ -1003,12 +1016,12 @@ cheat.register("onUpdate", function()
         tween_start_pos = nil
         ret_tween_start = nil
         ret_use_tween   = false
-        info_tp_status  = "Teleport disabled"
+        set_tp_status("Teleport disabled", nil)
         return
     end
 
     local hrp = local_char and local_char:FindFirstChild("HumanoidRootPart")
-    if not hrp then info_tp_status = "Char not found"; return end
+    if not hrp then set_tp_status("No character", false); return end
 
     if ptb_phase == "returning" then
         if ret_use_tween and ret_tween_start then
@@ -1019,23 +1032,23 @@ cheat.register("onUpdate", function()
             local new_pos  = ret_tween_start:Lerp(ptb_return_pos, alpha)
             for _ = 1, 25 do pcall(function() hrp.Position = new_pos end) end
             if progress >= 1.0 then
-                info_tp_status  = "Returned"
+                set_tp_status("Returned", true)
                 ptb_phase       = "idle"
                 ptb_return_pos  = nil
                 ret_tween_start = nil
             else
-                info_tp_status = string.format("Returning %d%%", math.floor(progress * 100))
+                set_tp_status(string.format("Returning %d%%", math.floor(progress * 100)), true)
             end
         else
             local target_pos = ptb_return_pos
             for _ = 1, 25 do pcall(function() hrp.Position = target_pos end) end
             local ok, dist = pcall(function() return (hrp.Position - target_pos).Magnitude end)
             if (ok and dist < 8) or (now_sec() - ptb_dwell_start > 0.5) then
-                info_tp_status = "Returned"
+                set_tp_status("Returned", true)
                 ptb_phase      = "idle"
                 ptb_return_pos = nil
             else
-                info_tp_status = "Returning..."
+                set_tp_status("Returning...", true)
             end
         end
         return
@@ -1053,9 +1066,9 @@ cheat.register("onUpdate", function()
             ret_tween_start_time = now_sec()
             ptb_phase            = "returning"
             ptb_dwell_start      = now_sec()
-            info_tp_status       = "Ball lost - returning"
+            set_tp_status("Ball lost - returning", nil)
         else
-            info_tp_status = "Ball not found"
+            set_tp_status("No ball", false)
         end
         return
     end
@@ -1074,10 +1087,13 @@ cheat.register("onUpdate", function()
                 ball.Position = tgt
                 ball.Velocity = preserve and saved_vel or Vector3.new(0, 0, 0)
             end)
-            info_tp_status = ok and ("Pulled " .. string.format("%.0f", dist) .. "st")
-                                or ("TP fail: " .. tostring(err))
+            if ok then
+                set_tp_status("Pulled " .. string.format("%.0f", dist) .. "st", true)
+            else
+                set_tp_status("Pull fail", false)
+            end
         else
-            info_tp_status = "Pull mode ready"
+            set_tp_status("Pull ready", true)
         end
 
     elseif mode == 1 then
@@ -1091,9 +1107,9 @@ cheat.register("onUpdate", function()
                 ball.Position = front_target(hrp)
                 ball.Velocity = Vector3.new(0, 0, 0)
             end)
-            info_tp_status = ok and "Glue mode: on" or "Glue mode: fail"
+            set_tp_status(ok and "Glue: on" or "Glue fail", ok and true or false)
         else
-            info_tp_status = "Glue mode: off"
+            set_tp_status("Glue: off (ready)", nil)
         end
 
     else
@@ -1138,7 +1154,7 @@ cheat.register("onUpdate", function()
                 ptb_phase       = "idle"
                 ptb_return_pos  = nil
             end
-            info_tp_status = gk_block_reason
+            set_tp_status(gk_block_reason, false)
             return
         end
 
@@ -1164,7 +1180,7 @@ cheat.register("onUpdate", function()
         if ptb_phase == "idle" then
             if clicked then
                 if is_local_holding then
-                    info_tp_status = "Holding ball"
+                    set_tp_status("You have ball", nil)
                 else
                     ptb_return_pos = hrp.Position
                     ptb_start_time = now_sec()
@@ -1174,15 +1190,15 @@ cheat.register("onUpdate", function()
                             tween_start_time = now_sec()
                             tween_to_phase   = "stealing"
                             ptb_phase        = "tweening"
-                            info_tp_status   = "Moving to enemy..."
+                            set_tp_status("Moving to enemy...", true)
                         else
                             local ok, err = pcall(function() hrp.Position = enemy_hrp.Position end)
                             if ok then
                                 ptb_phase       = "stealing"
                                 ptb_dwell_start = now_sec()
-                                info_tp_status  = "Stealing..."
+                                set_tp_status("Stealing...", true)
                             else
-                                info_tp_status = "Steal fail: " .. tostring(err)
+                                set_tp_status("Steal fail", false)
                                 ptb_return_pos = nil
                             end
                         end
@@ -1192,7 +1208,7 @@ cheat.register("onUpdate", function()
                             tween_start_time = now_sec()
                             tween_to_phase   = "at_ball"
                             ptb_phase        = "tweening"
-                            info_tp_status   = "Moving to ball..."
+                            set_tp_status("Moving to ball...", true)
                         else
                             local tgt = ball_approach_target()
                             local ok, err = pcall(function() hrp.Position = tgt end)
@@ -1200,9 +1216,9 @@ cheat.register("onUpdate", function()
                                 ptb_phase       = "at_ball"
                                 ptb_dwell_start = now_sec()
                                 ptb_retries     = 0
-                                info_tp_status  = "At ball..."
+                                set_tp_status("At ball...", true)
                             else
-                                info_tp_status = "TP fail: " .. tostring(err)
+                                set_tp_status("TP fail", false)
                                 ptb_return_pos = nil
                             end
                         end
@@ -1210,12 +1226,12 @@ cheat.register("onUpdate", function()
                 end
             else
                 if is_local_holding then
-                    info_tp_status = "Holding ball"
+                    set_tp_status("You have ball", nil)
                 elseif enemy_hrp then
                     local ok, dist = pcall(function() return (hrp.Position - enemy_hrp.Position).Magnitude end)
-                    info_tp_status = ok and string.format("Steal ready (%.0fst)", dist) or "Steal ready"
+                    set_tp_status(ok and string.format("Steal ready (%.0fst)", dist) or "Steal ready", true)
                 else
-                    info_tp_status = "To ball: ready"
+                    set_tp_status("To ball: ready", true)
                 end
             end
 
@@ -1229,7 +1245,7 @@ cheat.register("onUpdate", function()
                 ret_tween_start_time = now_sec()
                 ptb_phase            = "returning"
                 ptb_dwell_start      = now_sec()
-                info_tp_status       = "Timeout - returning"
+                set_tp_status("Timed out", nil)
                 return
             end
         end
@@ -1253,7 +1269,7 @@ cheat.register("onUpdate", function()
                 ret_tween_start_time = now_sec()
                 ptb_phase            = "returning"
                 ptb_dwell_start      = now_sec()
-                info_tp_status       = "Lost target"
+                set_tp_status("Lost target", nil)
                 return
             end
 
@@ -1265,15 +1281,15 @@ cheat.register("onUpdate", function()
                 if tween_to_phase == "stealing" then
                     ptb_phase       = "stealing"
                     ptb_dwell_start = now_sec()
-                    info_tp_status  = "Stealing..."
+                    set_tp_status("Stealing...", true)
                 else
                     ptb_phase       = "at_ball"
                     ptb_dwell_start = now_sec()
                     ptb_retries     = 0
-                    info_tp_status  = "At ball..."
+                    set_tp_status("At ball...", true)
                 end
             else
-                info_tp_status = string.format("Moving %d%%", math.floor(progress * 100))
+                set_tp_status(string.format("Moving %d%%", math.floor(progress * 100)), true)
             end
 
         elseif ptb_phase == "stealing" then
@@ -1290,9 +1306,9 @@ cheat.register("onUpdate", function()
                 ret_tween_start_time = now_sec()
                 ptb_phase            = "returning"
                 ptb_dwell_start      = now_sec()
-                info_tp_status       = "Returning..."
+                set_tp_status("Returning...", true)
             else
-                info_tp_status = string.format("Stealing %.1fs", steal_dwell - elapsed)
+                set_tp_status(string.format("Stealing %.1fs", steal_dwell - elapsed), true)
             end
 
         elseif ptb_phase == "at_ball" then
@@ -1308,7 +1324,7 @@ cheat.register("onUpdate", function()
                 ret_tween_start_time = now_sec()
                 ptb_phase            = "returning"
                 ptb_dwell_start      = now_sec()
-                info_tp_status       = "Got ball - returning"
+                set_tp_status("Got ball - returning", true)
                 return
             end
 
@@ -1331,7 +1347,7 @@ cheat.register("onUpdate", function()
                         pcall(function() hrp.Position = tgt end)
                         ptb_dwell_start = now_sec()
                     end
-                    info_tp_status = string.format("Retry %d/%d", ptb_retries, max_r)
+                    set_tp_status(string.format("Retry %d/%d", ptb_retries, max_r), nil)
                 else
                     ptb_retries          = 0
                     ret_use_tween        = use_tween
@@ -1339,10 +1355,10 @@ cheat.register("onUpdate", function()
                     ret_tween_start_time = now_sec()
                     ptb_phase            = "returning"
                     ptb_dwell_start      = now_sec()
-                    info_tp_status       = "Returning..."
+                    set_tp_status("Returning...", true)
                 end
             else
-                info_tp_status = string.format("At ball %.1fs", dwell - elapsed)
+                set_tp_status(string.format("At ball %.1fs", dwell - elapsed), true)
             end
         end
     end
@@ -1595,10 +1611,6 @@ cheat.register("onPaint", function()
     if ui.getValue(TAB, VIS, "Info Display") then
         local _sw, sh = cheat.GetWindowSize()
         local x       = 10
-        local COLOR_GREEN  = Color3.fromRGB(80, 255, 80)
-        local COLOR_RED    = Color3.fromRGB(255, 80, 80)
-        local COLOR_YELLOW = Color3.fromRGB(255, 220, 50)
-
         local lines = {}
         local function add(text, col) lines[#lines + 1] = {text, col or COLOR_WHITE} end
         local function hk_str(container, label)
@@ -1626,7 +1638,7 @@ cheat.register("onPaint", function()
         end
 
         if ui.getValue(TAB, FEAT, "Teleport Enabled") then
-            add("TP" .. hk_str(FEAT, "Teleport Key") .. "  " .. info_tp_status)
+            add("TP" .. hk_str(FEAT, "Teleport Key") .. "  " .. info_tp_status, info_tp_color)
         end
         if ui.getValue(TAB, FEAT, "Auto Goal") then
             local idx   = ui.getValue(TAB, FEAT, "Goal Target")
