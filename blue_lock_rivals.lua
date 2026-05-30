@@ -80,7 +80,7 @@ ui.NewCheckbox(TAB, VIS, "Shape")
 ui.NewColorpicker(TAB, VIS, "Shape Color", {r=0, g=120, b=255, a=255}, true)
 ui.NewCheckbox(TAB, VIS, "Shape Fill")
 ui.NewColorpicker(TAB, VIS, "Shape Fill Color", {r=0, g=120, b=255, a=50}, true)
-ui.newDropdown(TAB, VIS, "Shape Type", {"Star of David", "Hexagon", "Circle"})
+ui.newDropdown(TAB, VIS, "Shape Type", {"Star of David", "Hexagon", "Pentagon", "Circle"})
 ui.newSliderFloat(TAB, VIS, "Shape Size",      10.0, 100.0)
 ui.NewCheckbox(TAB, VIS, "Shape Spin")
 ui.newSliderFloat(TAB, VIS, "Spin Speed",       0.1, 10.0)
@@ -1939,6 +1939,17 @@ cheat.register("onPaint", function()
                     local pts = {}
                     for i = 0, 5 do
                         local a = shape_angle + i * (pi2 / 6)
+                        pts[i + 1] = {bsx + cos(a) * size, bsy + sin(a) * size}
+                    end
+                    if fill_on then draw.ConvexPolyFilled(pts, fill_color, fill_alpha) end
+                    if ol_shape then draw.Polyline(pts, COLOR_BLACK, true, thickness + 2, shape_alpha) end
+                    draw.Polyline(pts, shape_color, true, thickness, shape_alpha)
+
+                elseif shape_idx == 2 then
+                    -- Pentagon
+                    local pts = {}
+                    for i = 0, 4 do
+                        local a = shape_angle + i * (pi2 / 5)
                         pts[i + 1] = {bsx + cos(a) * size, bsy + sin(a) * size}
                     end
                     if fill_on then draw.ConvexPolyFilled(pts, fill_color, fill_alpha) end
