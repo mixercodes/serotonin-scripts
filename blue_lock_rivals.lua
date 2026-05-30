@@ -186,6 +186,7 @@ local _ball_track_t   = 0
 local prev_vel    = Vector3.new(0, 0, 0)
 local ball_status = "---"
 local goal_boxes  = {}
+local player_gks  = {}  -- {name, in_penalty} for each real-player GK this tick
 
 local COLOR_WHITE = Color3.new(1, 1, 1)
 local COLOR_BLUE  = Color3.fromHex("#3E79A7")
@@ -622,6 +623,27 @@ cheat.register("onUpdate", function()
     _last_refresh = t
     refresh_ball_refs()
     refresh_local_char()
+
+    -- refresh real-player GK list
+    player_gks = {}
+    local ok_pgk, all_pl = pcall(function() return entity.GetPlayers(false) end)
+    if ok_pgk and all_pl then
+        for _, p in ipairs(all_pl) do
+            local ok2, is_gk, in_pen = pcall(function()
+                local char = game.Workspace:FindFirstChild(p.Name)
+                local vals = char and char:FindFirstChild("Values")
+                local goalie = vals and vals:FindFirstChild("Goalie")
+                local in_p   = vals and vals:FindFirstChild("IsInPenalty")
+                return goalie and (goalie.Value == true or goalie.Value == 1),
+                       in_p   and (in_p.Value   == true or in_p.Value   == 1)
+            end)
+            if ok2 and is_gk then
+                local lp = game.LocalPlayer
+                local display_name = (lp and p.Name == lp.Name) and "You" or p.Name
+                player_gks[#player_gks + 1] = {name = display_name, in_penalty = in_pen}
+            end
+        end
+    end
 
     -- stale detection: GK possession is immediate; otherwise position-based (1s threshold)
     if local_has_ball then
@@ -1580,6 +1602,12 @@ cheat.register("onPaint", function()
         local display_status = local_has_ball and "You (held)" or ball_status
         add(tostring(info_speed) .. " st/s  " .. display_status)
         add("Dist  " .. info_dist)
+
+        for _, gk in ipairs(player_gks) do
+            local zone_str = gk.in_penalty and "in box" or "OUT of box"
+            local zone_col = gk.in_penalty and COLOR_YELLOW or COLOR_GREEN
+            add("GK " .. gk.name .. "  " .. zone_str, zone_col)
+        end
 
         if ui.getValue(TAB, FEAT, "Teleport Enabled") then
             add("TP" .. hk_str(FEAT, "Teleport Key") .. "  " .. info_tp_status)
