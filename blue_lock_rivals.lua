@@ -1,96 +1,124 @@
--- blue_lock_rivals.lua
+-- blue_lock_rivals.lua (merged with ball_manipulation)
 
 local TP_MODES     = {"Ball to Player (pull)", "Ball Control (glue)", "Player to Ball"}
 local TRAVEL_MODES = {"Instant", "Tween"}
 local VIS_FONTS    = {"SmallestPixel", "Verdana", "ConsolasBold", "Tahoma"}
 
-local TAB = "ballt_tab"
-local SPD = "ballt_spd"
-local TP  = "ballt_tp"
-local VIS = "ballt_vis"
+local TAB  = "blr_tab"
+local MAN  = "blr_man"
+local FEAT = "blr_feat"
+local VIS  = "blr_vis"
 
-local OFF_UP = 2.5
+local OFF_UP     = 2.5
+local pi         = math.pi
+local pi2        = pi * 2
+local sin, cos   = math.sin, math.cos
+local CONFIG_FILE = "blr_config.lua"
+
+local config_save, config_load  -- forward declarations for button callbacks
+local config_deleted = false
 
 ui.newTab(TAB, "BL:R")
 
--- [Ball Physics]
-ui.NewContainer(TAB, SPD, "Ball Physics", { autosize = true })
-ui.NewCheckbox(TAB, SPD, "Speed Enabled")
-ui.newHotkey(TAB, SPD, "Speed Key", true)
-ui.newSliderFloat(TAB, SPD, "Speed Multiplier", 1.0, 10.0)
-ui.newSliderFloat(TAB, SPD, "Smoothing", 0.0, 1.0)
-ui.NewCheckbox(TAB, SPD, "Enable Speed Cap")
-ui.newSliderFloat(TAB, SPD, "Max Speed Cap", 10.0, 500.0)
-ui.NewCheckbox(TAB, SPD, "Ball Arc")
-ui.newHotkey(TAB, SPD, "Arc Key", true)
-ui.newSliderFloat(TAB, SPD, "Arc Level", 0.0, 1.0)
+-- [Ball Manip]
+ui.NewContainer(TAB, MAN, "Ball Manip", { autosize = true })
+ui.NewCheckbox(TAB, MAN, "Orbit Enabled")
+ui.newHotkey(TAB, MAN, "Orbit Key", true)
+ui.newSliderFloat(TAB, MAN, "Radius",       0.5, 30.0)
+ui.newSliderFloat(TAB, MAN, "Height",      -5.0, 100.0)
+ui.newSliderFloat(TAB, MAN, "Speed (rps)",  0.1, 10.0)
+ui.NewCheckbox(TAB, MAN, "BC Enabled")
+ui.newHotkey(TAB, MAN, "BC Key", true)
+ui.newSliderFloat(TAB, MAN, "Move Speed",   1.0, 100.0)
+ui.NewCheckbox(TAB, MAN, "Freeze Player")
 
--- [Ball Teleport]
-ui.NewContainer(TAB, TP, "Ball Teleport", { autosize = true, next = true })
-ui.NewCheckbox(TAB, TP, "Teleport Enabled")
-ui.newHotkey(TAB, TP, "Teleport Key", true)
-ui.newDropdown(TAB, TP, "TP Mode", TP_MODES)
-ui.newDropdown(TAB, TP, "Travel Mode", TRAVEL_MODES)
-ui.newSliderFloat(TAB, TP, "Tween Time (sec)", 0.05, 1.0)
-ui.newSliderFloat(TAB, TP, "Return Time (sec)", 0.05, 1.0)
-ui.newSliderFloat(TAB, TP, "Dwell Time (sec)", 0.0, 5.0)
-ui.newSliderFloat(TAB, TP, "Steal Dwell (sec)", 0.1, 5.0)
-ui.NewCheckbox(TAB, TP, "Retry on Miss")
-ui.NewSliderInt(TAB, TP, "Max Retries", 1, 10)
-ui.NewCheckbox(TAB, TP, "Preserve Momentum")
-ui.NewCheckbox(TAB, TP, "Auto Goal")
-ui.newHotkey(TAB, TP, "Auto Goal Key", true)
-ui.newDropdown(TAB, TP, "Goal Target", {"Auto (enemy)", "Home", "Away"})
+-- [Ball Features]
+ui.NewContainer(TAB, FEAT, "Ball Features", { autosize = true, next = true })
+ui.NewCheckbox(TAB, FEAT, "Speed Enabled")
+ui.newHotkey(TAB, FEAT, "Speed Key", true)
+ui.newSliderFloat(TAB, FEAT, "Speed Multiplier", 1.0, 10.0)
+ui.newSliderFloat(TAB, FEAT, "Smoothing",         0.0, 1.0)
+ui.NewCheckbox(TAB, FEAT, "Enable Speed Cap")
+ui.newSliderFloat(TAB, FEAT, "Max Speed Cap",    10.0, 500.0)
+ui.NewCheckbox(TAB, FEAT, "Ball Arc")
+ui.newHotkey(TAB, FEAT, "Arc Key", true)
+ui.newSliderFloat(TAB, FEAT, "Arc Level",         0.0, 1.0)
+ui.NewCheckbox(TAB, FEAT, "Teleport Enabled")
+ui.newHotkey(TAB, FEAT, "Teleport Key", true)
+ui.newDropdown(TAB, FEAT, "TP Mode",     TP_MODES)
+ui.newDropdown(TAB, FEAT, "Travel Mode", TRAVEL_MODES)
+ui.newSliderFloat(TAB, FEAT, "Tween Time (sec)",  0.05, 1.0)
+ui.newSliderFloat(TAB, FEAT, "Return Time (sec)", 0.05, 1.0)
+ui.newSliderFloat(TAB, FEAT, "Dwell Time (sec)",  0.0,  5.0)
+ui.newSliderFloat(TAB, FEAT, "Steal Dwell (sec)", 0.1,  5.0)
+ui.NewCheckbox(TAB, FEAT, "Retry on Miss")
+ui.NewSliderInt(TAB, FEAT, "Max Retries", 1, 10)
+ui.NewCheckbox(TAB, FEAT, "Preserve Momentum")
+ui.NewCheckbox(TAB, FEAT, "Auto Goal")
+ui.newHotkey(TAB, FEAT, "Auto Goal Key", true)
+ui.newDropdown(TAB, FEAT, "Goal Target", {"Auto (enemy)", "Home", "Away"})
 
--- [Visuals]
+-- [Visuals & Config]
 ui.NewContainer(TAB, VIS, "Visuals", { autosize = true, next = true })
 ui.newDropdown(TAB, VIS, "Font", VIS_FONTS)
 ui.NewCheckbox(TAB, VIS, "Info Display")
 ui.NewCheckbox(TAB, VIS, "Ball ESP")
-ui.NewColorpicker(TAB, VIS, "Ball Color", {r=255, g=255, b=255, a=255}, true)
+ui.NewColorpicker(TAB, VIS, "Ball Color",      {r=255, g=255, b=255, a=255}, true)
 ui.NewCheckbox(TAB, VIS, "Ball ESP Text")
 ui.NewCheckbox(TAB, VIS, "Ball Fill")
-ui.NewColorpicker(TAB, VIS, "Ball Fill Color", {r=255, g=255, b=255, a=60}, true)
+ui.NewColorpicker(TAB, VIS, "Ball Fill Color", {r=255, g=255, b=255, a=60},  true)
 ui.NewCheckbox(TAB, VIS, "Goal ESP")
-ui.NewColorpicker(TAB, VIS, "Home Color", {r=0, g=180, b=255, a=255}, true)
-ui.NewColorpicker(TAB, VIS, "Away Color", {r=255, g=80, b=80, a=255}, true)
+ui.NewColorpicker(TAB, VIS, "Home Color",      {r=0, g=180, b=255, a=255},   true)
+ui.NewColorpicker(TAB, VIS, "Away Color",      {r=255, g=80, b=80, a=255},   true)
 ui.NewCheckbox(TAB, VIS, "Goal ESP Text")
 ui.NewCheckbox(TAB, VIS, "Goal Fill")
-ui.NewColorpicker(TAB, VIS, "Home Fill Color", {r=0, g=180, b=255, a=40}, true)
-ui.NewColorpicker(TAB, VIS, "Away Fill Color", {r=255, g=80, b=80, a=40}, true)
+ui.NewColorpicker(TAB, VIS, "Home Fill Color", {r=0, g=180, b=255, a=40},    true)
+ui.NewColorpicker(TAB, VIS, "Away Fill Color", {r=255, g=80, b=80, a=40},    true)
+ui.NewButton(TAB, VIS, "Save Config",   function() config_save() end)
+ui.NewButton(TAB, VIS, "Load Config",   function() config_load() end)
+ui.NewButton(TAB, VIS, "Delete Config", function() file.delete(CONFIG_FILE); config_deleted = true end)
 
--- defaults
-ui.setValue(TAB, SPD, "Speed Enabled",    false)
-ui.setValue(TAB, SPD, "Speed Key",        0x06)
-ui.setValue(TAB, SPD, "Speed Multiplier", 2.0)
-ui.setValue(TAB, SPD, "Smoothing",        0.0)
-ui.setValue(TAB, SPD, "Enable Speed Cap", false)
-ui.setValue(TAB, SPD, "Max Speed Cap",    150.0)
-ui.setValue(TAB, SPD, "Ball Arc",         false)
-ui.setValue(TAB, SPD, "Arc Key",          0x05)
-ui.setValue(TAB, SPD, "Arc Level",        0.5)
-ui.setValue(TAB, TP,  "Teleport Enabled", false)
-ui.setValue(TAB, TP,  "Teleport Key",     0x5A)
-ui.setValue(TAB, TP,  "TP Mode",          2)
-ui.setValue(TAB, TP,  "Travel Mode",      1)
-ui.setValue(TAB, TP,  "Tween Time (sec)", 0.05)
-ui.setValue(TAB, TP,  "Return Time (sec)", 0.05)
-ui.setValue(TAB, TP,  "Dwell Time (sec)", 0.3)
-ui.setValue(TAB, TP,  "Steal Dwell (sec)", 0.6)
-ui.setValue(TAB, TP,  "Retry on Miss",    false)
-ui.setValue(TAB, TP,  "Max Retries",      3)
-ui.setValue(TAB, TP,  "Preserve Momentum", true)
-ui.setValue(TAB, TP,  "Auto Goal",        false)
-ui.setValue(TAB, TP,  "Auto Goal Key",    0x46)
-ui.setValue(TAB, TP,  "Goal Target",      0)
-ui.setValue(TAB, VIS, "Font",             1)
-ui.setValue(TAB, VIS, "Info Display",     true)
-ui.setValue(TAB, VIS, "Ball ESP",         false)
-ui.setValue(TAB, VIS, "Ball ESP Text",    true)
-ui.setValue(TAB, VIS, "Ball Fill",        false)
-ui.setValue(TAB, VIS, "Goal ESP",         false)
-ui.setValue(TAB, VIS, "Goal ESP Text",    true)
-ui.setValue(TAB, VIS, "Goal Fill",        false)
+-- [Defaults]
+ui.setValue(TAB, MAN, "Orbit Enabled", false)
+ui.setValue(TAB, MAN, "Radius",        3.5)
+ui.setValue(TAB, MAN, "Height",        10.0)
+ui.setValue(TAB, MAN, "Speed (rps)",   0.5)
+ui.setValue(TAB, MAN, "BC Enabled",    false)
+ui.setValue(TAB, MAN, "Move Speed",    15.0)
+ui.setValue(TAB, MAN, "Freeze Player", true)
+
+ui.setValue(TAB, FEAT, "Speed Enabled",     false)
+ui.setValue(TAB, FEAT, "Speed Key",         0x06)
+ui.setValue(TAB, FEAT, "Speed Multiplier",  2.0)
+ui.setValue(TAB, FEAT, "Smoothing",         0.0)
+ui.setValue(TAB, FEAT, "Enable Speed Cap",  false)
+ui.setValue(TAB, FEAT, "Max Speed Cap",     150.0)
+ui.setValue(TAB, FEAT, "Ball Arc",          false)
+ui.setValue(TAB, FEAT, "Arc Key",           0x05)
+ui.setValue(TAB, FEAT, "Arc Level",         0.5)
+ui.setValue(TAB, FEAT, "Teleport Enabled",  false)
+ui.setValue(TAB, FEAT, "Teleport Key",      0x5A)
+ui.setValue(TAB, FEAT, "TP Mode",           2)
+ui.setValue(TAB, FEAT, "Travel Mode",       1)
+ui.setValue(TAB, FEAT, "Tween Time (sec)",  0.05)
+ui.setValue(TAB, FEAT, "Return Time (sec)", 0.05)
+ui.setValue(TAB, FEAT, "Dwell Time (sec)",  0.3)
+ui.setValue(TAB, FEAT, "Steal Dwell (sec)", 0.6)
+ui.setValue(TAB, FEAT, "Retry on Miss",     false)
+ui.setValue(TAB, FEAT, "Max Retries",       3)
+ui.setValue(TAB, FEAT, "Preserve Momentum", true)
+ui.setValue(TAB, FEAT, "Auto Goal",         false)
+ui.setValue(TAB, FEAT, "Auto Goal Key",     0x46)
+ui.setValue(TAB, FEAT, "Goal Target",       0)
+
+ui.setValue(TAB, VIS, "Font",          1)
+ui.setValue(TAB, VIS, "Info Display",  true)
+ui.setValue(TAB, VIS, "Ball ESP",      false)
+ui.setValue(TAB, VIS, "Ball ESP Text", true)
+ui.setValue(TAB, VIS, "Ball Fill",     false)
+ui.setValue(TAB, VIS, "Goal ESP",      false)
+ui.setValue(TAB, VIS, "Goal ESP Text", true)
+ui.setValue(TAB, VIS, "Goal Fill",     false)
 
 -- [Shared state]
 
@@ -101,11 +129,135 @@ local holder_char = nil
 local local_char  = nil
 local prev_vel    = Vector3.new(0, 0, 0)
 local ball_status = "---"
+local goal_boxes  = {}
 
 local COLOR_WHITE = Color3.new(1, 1, 1)
 local COLOR_BLUE  = Color3.fromHex("#3E79A7")
-
 local _screen_buf = {}
+
+local orbit_active = false
+local orbit_angle  = 0.0
+local orbit_last   = utility.GetTickCount()
+
+local bc_active = false
+local bc_pos_x, bc_pos_y, bc_pos_z = 0, 0, 0
+local frozen_x, frozen_y, frozen_z = 0, 0, 0
+
+local cam_fwx, cam_fwz = 0, 1
+local cam_rx,  cam_rz  = 1, 0
+
+local hk_prev = {}
+
+local info_speed     = 0
+local info_dist      = "--"
+local info_tp_status = "Teleport disabled"
+
+local flat_lock_y  = nil
+local speed_active = false
+local arc_active   = false
+
+local glue_active          = false
+local auto_goal_active     = false
+local ptb_phase            = "idle"
+local ptb_return_pos       = nil
+local ptb_dwell_start      = 0
+local ptb_retries          = 0
+local ptb_start_time       = 0
+local tween_to_phase       = "at_ball"
+local tween_start_pos      = nil
+local tween_start_time     = 0
+local ret_tween_start      = nil
+local ret_tween_start_time = 0
+local ret_use_tween        = false
+
+local PTB_TIMEOUT = 3.0
+
+-- [Helpers]
+
+local function hotkey_clicked(label, container)
+    local key  = container .. "|" .. label
+    local now  = ui.getValue(TAB, container, label)
+    local prev = hk_prev[key] or false
+    hk_prev[key] = now
+    local hk   = ui.getHotkey(TAB, container, label)
+    local mode = hk and hk.mode or 0
+    if mode == 0 then
+        return now and not prev
+    else
+        return now ~= prev
+    end
+end
+
+local function hotkey_is_hold(label, container)
+    local hk = ui.getHotkey(TAB, container, label)
+    return (hk and hk.mode or 0) == 0
+end
+
+local function now_sec()
+    return utility.GetTickCount() / 1000
+end
+
+local function front_target(hrp)
+    return hrp.Position + Vector3.new(0, OFF_UP, 0)
+end
+
+local function picker_to_color3(t)
+    if not t then return COLOR_WHITE end
+    return Color3.fromRGB(t.r or 255, t.g or 255, t.b or 255)
+end
+
+local function get_ball_pos()
+    if held_ball and held_ball.Parent then
+        local ok, p = pcall(function() return held_ball.Position end)
+        if ok and p then return p end
+    end
+    if world_ball and world_ball.Parent then
+        local ok, p = pcall(function() return world_ball.Position end)
+        if ok and p then return p end
+    end
+    if free_ball and free_ball.Parent then
+        local ok, p = pcall(function() return free_ball.Position end)
+        if ok and p then return p end
+    end
+    return nil
+end
+
+-- [Camera axes for BC movement]
+
+local function get_cam_axes()
+    local cam_pos = game.CameraPosition
+    if not cam_pos then return nil end
+
+    local sw, _sh = cheat.GetWindowSize()
+    local cx = sw * 0.5
+    local R  = 200
+
+    local de
+    local ex, _, eok = utility.WorldToScreen(Vector3.new(cam_pos.X + R, cam_pos.Y, cam_pos.Z))
+    if eok then
+        de = ex - cx
+    else
+        local wx, _, wok = utility.WorldToScreen(Vector3.new(cam_pos.X - R, cam_pos.Y, cam_pos.Z))
+        if wok then de = -(wx - cx) else return nil end
+    end
+
+    local dz
+    local zx, _, zok = utility.WorldToScreen(Vector3.new(cam_pos.X, cam_pos.Y, cam_pos.Z + R))
+    if zok then
+        dz = zx - cx
+    else
+        local nx, _, nok = utility.WorldToScreen(Vector3.new(cam_pos.X, cam_pos.Y, cam_pos.Z - R))
+        if nok then dz = -(nx - cx) else return nil end
+    end
+
+    local len = math.sqrt(de * de + dz * dz)
+    if len < 0.5 then return nil end
+    local rx = de / len
+    local rz = dz / len
+    return -rz, rx, rx, rz
+end
+
+-- [Ball / char refresh]
 
 local function refresh_ball_refs()
     local ball_model = game.Workspace:FindFirstChild("Ball")
@@ -140,25 +292,24 @@ local function refresh_local_char()
     local_char = name and game.Workspace:FindFirstChild(name) or nil
 end
 
-local _last_refresh = 0
-cheat.register("onUpdate", function()
-    local t = utility.GetTickCount() / 1000
-    if t - _last_refresh < 0.033 then return end
-    _last_refresh = t
-    refresh_ball_refs()
-    refresh_local_char()
-end)
-
-cheat.register("onUpdate", function()
-    if held_ball  and not held_ball.Parent  then held_ball = nil; holder_char = nil end
-    if free_ball  and not free_ball.Parent  then free_ball  = nil end
-    if world_ball and not world_ball.Parent then world_ball = nil end
-    if local_char and not local_char.Parent then local_char = nil end
-end)
+local function bc_init()
+    local cam_pos = game.CameraPosition
+    if not cam_pos then return end
+    local lp  = entity.GetLocalPlayer()
+    local hrp = lp and lp:GetBonePosition("HumanoidRootPart")
+    if hrp then
+        bc_pos_x = hrp.X
+        bc_pos_y = hrp.Y + 10
+        bc_pos_z = hrp.Z
+        frozen_x, frozen_y, frozen_z = hrp.X, hrp.Y, hrp.Z
+    else
+        bc_pos_x = cam_pos.X
+        bc_pos_y = cam_pos.Y + 10
+        bc_pos_z = cam_pos.Z
+    end
+end
 
 -- [Goal refs]
-
-local goal_boxes = {}
 
 local function refresh_goal_refs()
     goal_boxes = {}
@@ -177,76 +328,55 @@ local function refresh_goal_refs()
     end
 end
 
-cheat.register("onSlowUpdate", refresh_goal_refs)
-
--- [Helpers]
-
-local function now_sec()
-    return utility.GetTickCount() / 1000
-end
-
-local hk_prev = {}
-local function hotkey_clicked(label, container)
-    container = container or TP
-    local key  = container .. "|" .. label
-    local now  = ui.getValue(TAB, container, label)
-    local edge = now and not (hk_prev[key] or false)
-    hk_prev[key] = now
-    return edge
-end
-
-local function hotkey_is_hold(label, container)
-    container = container or TP
-    local hk = ui.getHotkey(TAB, container, label)
-    return (hk and hk.mode or 0) == 0
-end
-
-local function front_target(hrp)
-    return hrp.Position + Vector3.new(0, OFF_UP, 0)
-end
-
 -- [Config]
 
-local CONFIG_FILE = "blr_config.lua"
-
 local SAVE_WIDGETS = {
-    {SPD, "Speed Enabled",     "val"},
-    {SPD, "Speed Key",         "hk"},
-    {SPD, "Speed Multiplier",  "val"},
-    {SPD, "Smoothing",         "val"},
-    {SPD, "Enable Speed Cap",  "val"},
-    {SPD, "Max Speed Cap",     "val"},
-    {SPD, "Ball Arc",          "val"},
-    {SPD, "Arc Key",           "hk"},
-    {SPD, "Arc Level",         "val"},
-    {TP,  "Teleport Enabled",  "val"},
-    {TP,  "Teleport Key",      "hk"},
-    {TP,  "TP Mode",           "val"},
-    {TP,  "Travel Mode",       "val"},
-    {TP,  "Tween Time (sec)",  "val"},
-    {TP,  "Return Time (sec)", "val"},
-    {TP,  "Dwell Time (sec)",  "val"},
-    {TP,  "Steal Dwell (sec)", "val"},
-    {TP,  "Retry on Miss",     "val"},
-    {TP,  "Max Retries",       "val"},
-    {TP,  "Preserve Momentum", "val"},
-    {TP,  "Auto Goal",         "val"},
-    {TP,  "Auto Goal Key",     "hk"},
-    {TP,  "Goal Target",       "val"},
-    {VIS, "Font",              "val"},
-    {VIS, "Info Display",      "val"},
-    {VIS, "Ball ESP",          "val"},
-    {VIS, "Ball Color",        "val"},
-    {VIS, "Ball ESP Text",     "val"},
-    {VIS, "Ball Fill",         "val"},
-    {VIS, "Ball Fill Color",   "val"},
-    {VIS, "Goal ESP",          "val"},
-    {VIS, "Home Color",        "val"},
-    {VIS, "Away Color",        "val"},
-    {VIS, "Goal ESP Text",     "val"},
-    {VIS, "Goal Fill",         "val"},
-    {VIS, "Home Fill Color",   "val"},
-    {VIS, "Away Fill Color",   "val"},
+    {MAN,  "Orbit Enabled",    "val"},
+    {MAN,  "Orbit Key",        "hk"},
+    {MAN,  "Radius",           "val"},
+    {MAN,  "Height",           "val"},
+    {MAN,  "Speed (rps)",      "val"},
+    {MAN,  "BC Enabled",       "val"},
+    {MAN,  "BC Key",           "hk"},
+    {MAN,  "Move Speed",       "val"},
+    {MAN,  "Freeze Player",    "val"},
+    {FEAT, "Speed Enabled",    "val"},
+    {FEAT, "Speed Key",        "hk"},
+    {FEAT, "Speed Multiplier", "val"},
+    {FEAT, "Smoothing",        "val"},
+    {FEAT, "Enable Speed Cap", "val"},
+    {FEAT, "Max Speed Cap",    "val"},
+    {FEAT, "Ball Arc",         "val"},
+    {FEAT, "Arc Key",          "hk"},
+    {FEAT, "Arc Level",        "val"},
+    {FEAT, "Teleport Enabled", "val"},
+    {FEAT, "Teleport Key",     "hk"},
+    {FEAT, "TP Mode",          "val"},
+    {FEAT, "Travel Mode",      "val"},
+    {FEAT, "Tween Time (sec)", "val"},
+    {FEAT, "Return Time (sec)","val"},
+    {FEAT, "Dwell Time (sec)", "val"},
+    {FEAT, "Steal Dwell (sec)","val"},
+    {FEAT, "Retry on Miss",    "val"},
+    {FEAT, "Max Retries",      "val"},
+    {FEAT, "Preserve Momentum","val"},
+    {FEAT, "Auto Goal",        "val"},
+    {FEAT, "Auto Goal Key",    "hk"},
+    {FEAT, "Goal Target",      "val"},
+    {VIS,  "Font",             "val"},
+    {VIS,  "Info Display",     "val"},
+    {VIS,  "Ball ESP",         "val"},
+    {VIS,  "Ball Color",       "val"},
+    {VIS,  "Ball ESP Text",    "val"},
+    {VIS,  "Ball Fill",        "val"},
+    {VIS,  "Ball Fill Color",  "val"},
+    {VIS,  "Goal ESP",         "val"},
+    {VIS,  "Home Color",       "val"},
+    {VIS,  "Away Color",       "val"},
+    {VIS,  "Goal ESP Text",    "val"},
+    {VIS,  "Goal Fill",        "val"},
+    {VIS,  "Home Fill Color",  "val"},
+    {VIS,  "Away Fill Color",  "val"},
 }
 
 local function ser(v)
@@ -263,7 +393,7 @@ local function ser(v)
     return "nil"
 end
 
-local function config_save()
+config_save = function()
     local lines = {"return {"}
     for _, w in ipairs(SAVE_WIDGETS) do
         local container, label, wtype = w[1], w[2], w[3]
@@ -280,7 +410,7 @@ local function config_save()
     file.write(CONFIG_FILE, table.concat(lines, "\n"))
 end
 
-local function config_load()
+config_load = function()
     local src = file.read(CONFIG_FILE)
     if not src then return end
     local fn = loadstring(src)
@@ -296,32 +426,31 @@ local function config_load()
     end
 end
 
-config_load()
+config_load()  -- auto-load on startup
 
-local function picker_to_color3(t)
-    if not t then return COLOR_WHITE end
-    return Color3.fromRGB(t.r or 255, t.g or 255, t.b or 255)
-end
+-- [Slow update: goal refs]
 
-local info_speed     = 0
-local info_dist      = "--"
-local info_tp_status = "Teleport disabled"
+cheat.register("onSlowUpdate", refresh_goal_refs)
 
-local function get_ball_pos()
-    if held_ball and held_ball.Parent then
-        local ok, p = pcall(function() return held_ball.Position end)
-        if ok and p then return p end
-    end
-    if world_ball and world_ball.Parent then
-        local ok, p = pcall(function() return world_ball.Position end)
-        if ok and p then return p end
-    end
-    if free_ball and free_ball.Parent then
-        local ok, p = pcall(function() return free_ball.Position end)
-        if ok and p then return p end
-    end
-    return nil
-end
+-- [Update: ball/char refresh]
+
+local _last_refresh = 0
+cheat.register("onUpdate", function()
+    local t = utility.GetTickCount() / 1000
+    if t - _last_refresh < 0.033 then return end
+    _last_refresh = t
+    refresh_ball_refs()
+    refresh_local_char()
+end)
+
+cheat.register("onUpdate", function()
+    if held_ball  and not held_ball.Parent  then held_ball = nil; holder_char = nil end
+    if free_ball  and not free_ball.Parent  then free_ball  = nil end
+    if world_ball and not world_ball.Parent then world_ball = nil end
+    if local_char and not local_char.Parent then local_char = nil end
+end)
+
+-- [Update: ball distance info]
 
 cheat.register("onUpdate", function()
     local ball_pos = get_ball_pos()
@@ -333,38 +462,37 @@ cheat.register("onUpdate", function()
     end
 end)
 
--- [Conditional visibility]
+-- [Update: conditional visibility]
 
 cheat.register("onUpdate", function()
-    local tp_on    = ui.getValue(TAB, TP, "Teleport Enabled")
-    local mode     = ui.getValue(TAB, TP, "TP Mode")
-    local is_pull  = mode == 0
-    local is_ptb   = mode == 2
-    local is_tween = is_ptb and ui.getValue(TAB, TP, "Travel Mode") == 1
-    local retry_on = is_ptb and ui.getValue(TAB, TP, "Retry on Miss")
-    local auto_g   = tp_on and ui.getValue(TAB, TP, "Auto Goal")
+    local tp_on   = ui.getValue(TAB, FEAT, "Teleport Enabled")
+    local mode    = ui.getValue(TAB, FEAT, "TP Mode")
+    local is_pull = mode == 0
+    local is_ptb  = mode == 2
+    local is_tween  = is_ptb and ui.getValue(TAB, FEAT, "Travel Mode") == 1
+    local retry_on  = is_ptb and ui.getValue(TAB, FEAT, "Retry on Miss")
+    local auto_g    = tp_on and ui.getValue(TAB, FEAT, "Auto Goal")
 
-    local spd_on  = ui.getValue(TAB, SPD, "Speed Enabled")
-    local cap_on  = spd_on and ui.getValue(TAB, SPD, "Enable Speed Cap")
-    local arc_on  = ui.getValue(TAB, SPD, "Ball Arc")
+    local spd_on = ui.getValue(TAB, FEAT, "Speed Enabled")
+    local cap_on = spd_on and ui.getValue(TAB, FEAT, "Enable Speed Cap")
+    local arc_on = ui.getValue(TAB, FEAT, "Ball Arc")
 
-    ui.SetVisibility(TAB, SPD, "Speed Multiplier", spd_on)
-    ui.SetVisibility(TAB, SPD, "Smoothing",        spd_on)
-    ui.SetVisibility(TAB, SPD, "Enable Speed Cap", spd_on)
-    ui.SetVisibility(TAB, SPD, "Max Speed Cap",    cap_on)
-    ui.SetVisibility(TAB, SPD, "Arc Level",        arc_on)
-
-    ui.SetVisibility(TAB, TP, "TP Mode",           tp_on)
-    ui.SetVisibility(TAB, TP, "Travel Mode",       tp_on and is_ptb)
-    ui.SetVisibility(TAB, TP, "Tween Time (sec)",  tp_on and is_tween)
-    ui.SetVisibility(TAB, TP, "Return Time (sec)", tp_on and is_tween)
-    ui.SetVisibility(TAB, TP, "Dwell Time (sec)",  tp_on and is_ptb)
-    ui.SetVisibility(TAB, TP, "Steal Dwell (sec)", tp_on and is_ptb)
-    ui.SetVisibility(TAB, TP, "Retry on Miss",     tp_on and is_ptb)
-    ui.SetVisibility(TAB, TP, "Max Retries",       tp_on and is_ptb and retry_on)
-    ui.SetVisibility(TAB, TP, "Preserve Momentum", tp_on and is_pull)
-    ui.SetVisibility(TAB, TP, "Auto Goal",         tp_on)
-    ui.SetVisibility(TAB, TP, "Goal Target",       auto_g)
+    ui.SetVisibility(TAB, FEAT, "Speed Multiplier",  spd_on)
+    ui.SetVisibility(TAB, FEAT, "Smoothing",          spd_on)
+    ui.SetVisibility(TAB, FEAT, "Enable Speed Cap",   spd_on)
+    ui.SetVisibility(TAB, FEAT, "Max Speed Cap",      cap_on)
+    ui.SetVisibility(TAB, FEAT, "Arc Level",          arc_on)
+    ui.SetVisibility(TAB, FEAT, "TP Mode",            tp_on)
+    ui.SetVisibility(TAB, FEAT, "Travel Mode",        tp_on and is_ptb)
+    ui.SetVisibility(TAB, FEAT, "Tween Time (sec)",   tp_on and is_tween)
+    ui.SetVisibility(TAB, FEAT, "Return Time (sec)",  tp_on and is_tween)
+    ui.SetVisibility(TAB, FEAT, "Dwell Time (sec)",   tp_on and is_ptb)
+    ui.SetVisibility(TAB, FEAT, "Steal Dwell (sec)",  tp_on and is_ptb)
+    ui.SetVisibility(TAB, FEAT, "Retry on Miss",      tp_on and is_ptb)
+    ui.SetVisibility(TAB, FEAT, "Max Retries",        tp_on and is_ptb and retry_on)
+    ui.SetVisibility(TAB, FEAT, "Preserve Momentum",  tp_on and is_pull)
+    ui.SetVisibility(TAB, FEAT, "Auto Goal",          tp_on)
+    ui.SetVisibility(TAB, FEAT, "Goal Target",        auto_g)
 
     local ball_esp  = ui.getValue(TAB, VIS, "Ball ESP")
     local ball_fill = ball_esp and ui.getValue(TAB, VIS, "Ball Fill")
@@ -383,37 +511,32 @@ cheat.register("onUpdate", function()
     ui.SetVisibility(TAB, VIS, "Away Fill Color", goal_fill)
 end)
 
--- [Speed / Arc logic]
-
-local flat_lock_y = nil
-
-local speed_active = false
-local arc_active   = false
+-- [Update: ball physics (speed / arc)]
 
 cheat.register("onUpdate", function()
-    local spd_enabled = ui.getValue(TAB, SPD, "Speed Enabled")
+    local spd_enabled = ui.getValue(TAB, FEAT, "Speed Enabled")
     if spd_enabled then
-        if hotkey_is_hold("Speed Key", SPD) then
-            speed_active = ui.getValue(TAB, SPD, "Speed Key") == true
-        elseif hotkey_clicked("Speed Key", SPD) then
+        if hotkey_is_hold("Speed Key", FEAT) then
+            speed_active = ui.getValue(TAB, FEAT, "Speed Key") == true
+        elseif hotkey_clicked("Speed Key", FEAT) then
             speed_active = not speed_active
         end
     else
         speed_active = false
     end
 
-    local spd_on = spd_enabled and speed_active
-
-    local arc_enabled = ui.getValue(TAB, SPD, "Ball Arc")
+    local arc_enabled = ui.getValue(TAB, FEAT, "Ball Arc")
     if arc_enabled then
-        if hotkey_is_hold("Arc Key", SPD) then
-            arc_active = ui.getValue(TAB, SPD, "Arc Key") == true
-        elseif hotkey_clicked("Arc Key", SPD) then
+        if hotkey_is_hold("Arc Key", FEAT) then
+            arc_active = ui.getValue(TAB, FEAT, "Arc Key") == true
+        elseif hotkey_clicked("Arc Key", FEAT) then
             arc_active = not arc_active
         end
     else
         arc_active = false
     end
+
+    local spd_on = spd_enabled and speed_active
     local arc_on = arc_enabled and arc_active
     if not spd_on and not arc_on then flat_lock_y = nil; return end
 
@@ -424,13 +547,11 @@ cheat.register("onUpdate", function()
     if not ok or not vel then return end
     if vel.Magnitude < 0.5 then flat_lock_y = nil; return end
 
-    -- [speed multiplier]
     if spd_on then
-        local multiplier = ui.getValue(TAB, SPD, "Speed Multiplier")
-        local smoothing  = ui.getValue(TAB, SPD, "Smoothing")
-        local cap        = ui.getValue(TAB, SPD, "Enable Speed Cap")
-        local max_speed  = ui.getValue(TAB, SPD, "Max Speed Cap")
-
+        local multiplier = ui.getValue(TAB, FEAT, "Speed Multiplier")
+        local smoothing  = ui.getValue(TAB, FEAT, "Smoothing")
+        local cap        = ui.getValue(TAB, FEAT, "Enable Speed Cap")
+        local max_speed  = ui.getValue(TAB, FEAT, "Max Speed Cap")
         local boosted = vel * multiplier
         if smoothing > 0 then
             boosted = prev_vel:Lerp(boosted, 1 - smoothing)
@@ -443,9 +564,8 @@ cheat.register("onUpdate", function()
         vel = boosted
     end
 
-    -- [arc / flat path]
     if arc_on then
-        local arc   = ui.getValue(TAB, SPD, "Arc Level")
+        local arc   = ui.getValue(TAB, FEAT, "Arc Level")
         local horiz = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
         if horiz < 0.1 then flat_lock_y = nil; return end
 
@@ -464,7 +584,6 @@ cheat.register("onUpdate", function()
                 end)
             end
         else
-            -- nudge Y toward target ratio each frame rather than collapsing instantly
             local target_vy = vel.Y * arc
             pcall(function()
                 target.Velocity = Vector3.new(vel.X, vel.Y + (target_vy - vel.Y) * 0.2, vel.Z)
@@ -476,36 +595,126 @@ cheat.register("onUpdate", function()
     end
 end)
 
--- [Teleport / Ball Control logic]
-
-local glue_active        = false
-local auto_goal_active   = false
-local ptb_phase          = "idle"
-local ptb_return_pos     = nil
-local ptb_dwell_start    = 0
-local ptb_retries        = 0
-local ptb_start_time     = 0
-local tween_to_phase     = "at_ball"
-local tween_start_pos    = nil
-local tween_start_time   = 0
-local ret_tween_start      = nil
-local ret_tween_start_time = 0
-local ret_use_tween        = false
-
-local PTB_TIMEOUT = 3.0
+-- [Update: orbit + ball control]
 
 cheat.register("onUpdate", function()
-    if not ui.getValue(TAB, TP, "Teleport Enabled") then
-        if ptb_phase == "stealing" then keyboard.Release("e") end
-        glue_active        = false
-        ptb_phase          = "idle"
-        ptb_retries        = 0
-        ptb_return_pos     = nil
-        tween_start_pos    = nil
+    local orb_enabled = ui.getValue(TAB, MAN, "Orbit Enabled")
+    if orb_enabled then
+        if hotkey_is_hold("Orbit Key", MAN) then
+            orbit_active = ui.getValue(TAB, MAN, "Orbit Key") == true
+        elseif hotkey_clicked("Orbit Key", MAN) then
+            orbit_active = not orbit_active
+        end
+    else
+        orbit_active = false
+    end
 
-        ret_tween_start    = nil
-        ret_use_tween      = false
-        info_tp_status     = "Teleport disabled"
+    local bc_enabled = ui.getValue(TAB, MAN, "BC Enabled")
+    local was_bc = bc_active
+    if bc_enabled then
+        if hotkey_is_hold("BC Key", MAN) then
+            bc_active = ui.getValue(TAB, MAN, "BC Key") == true
+        elseif hotkey_clicked("BC Key", MAN) then
+            bc_active = not bc_active
+        end
+    else
+        bc_active = false
+    end
+
+    if bc_active and not was_bc then bc_init() end
+
+    local ball = world_ball
+             or (held_ball and held_ball.Parent and held_ball)
+             or (free_ball and free_ball.Parent and free_ball)
+    if not ball or not ball.Parent then return end
+
+    if bc_active then
+        local dt   = utility.GetDeltaTime()
+        local spd  = ui.getValue(TAB, MAN, "Move Speed")
+        local step = spd * 10 * dt
+
+        if keyboard.IsPressed("W") then
+            bc_pos_x = bc_pos_x - cam_fwx * step
+            bc_pos_z = bc_pos_z - cam_fwz * step
+        end
+        if keyboard.IsPressed("S") then
+            bc_pos_x = bc_pos_x + cam_fwx * step
+            bc_pos_z = bc_pos_z + cam_fwz * step
+        end
+        if keyboard.IsPressed("A") then
+            bc_pos_x = bc_pos_x - cam_rx * step
+            bc_pos_z = bc_pos_z - cam_rz * step
+        end
+        if keyboard.IsPressed("D") then
+            bc_pos_x = bc_pos_x + cam_rx * step
+            bc_pos_z = bc_pos_z + cam_rz * step
+        end
+        if keyboard.IsPressed("Space") then bc_pos_y = bc_pos_y + step end
+        if keyboard.IsPressed("Shift") then bc_pos_y = bc_pos_y - step end
+
+        ball.Position = Vector3.new(bc_pos_x, bc_pos_y, bc_pos_z)
+        ball.Velocity = Vector3.new(0, 0, 0)
+
+        if ui.getValue(TAB, MAN, "Freeze Player") then
+            local lp = entity.GetLocalPlayer()
+            if lp then
+                local char     = game.Workspace:FindFirstChild(lp.Name)
+                local hrp_part = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp_part then
+                    local cur = lp:GetBonePosition("HumanoidRootPart")
+                    if cur then
+                        local dx = cur.X - frozen_x
+                        local dz = cur.Z - frozen_z
+                        if dx*dx + dz*dz < 100 then
+                            hrp_part.Position = Vector3.new(frozen_x, frozen_y, frozen_z)
+                            hrp_part.Velocity = Vector3.new(0, 0, 0)
+                        else
+                            frozen_x, frozen_y, frozen_z = cur.X, cur.Y, cur.Z
+                        end
+                    end
+                end
+            end
+        end
+
+    elseif orbit_active then
+        local lp = entity.GetLocalPlayer()
+        if not lp then return end
+        local hrp = lp:GetBonePosition("HumanoidRootPart")
+        if not hrp then return end
+
+        local now  = utility.GetTickCount()
+        local dt   = (now - orbit_last) / 1000.0
+        orbit_last = now
+
+        local radius = ui.getValue(TAB, MAN, "Radius")
+        local height = ui.getValue(TAB, MAN, "Height")
+        local spd    = ui.getValue(TAB, MAN, "Speed (rps)")
+
+        orbit_angle = orbit_angle + dt * spd * pi2
+        if orbit_angle > pi2 then orbit_angle = orbit_angle - pi2 end
+
+        ball.Position = Vector3.new(
+            hrp.X + cos(orbit_angle) * radius,
+            hrp.Y + height,
+            hrp.Z + sin(orbit_angle) * radius
+        )
+        ball.Velocity = Vector3.new(0, 0, 0)
+    end
+end)
+
+-- [Update: teleport]
+
+cheat.register("onUpdate", function()
+    if not ui.getValue(TAB, FEAT, "Teleport Enabled") then
+        if ptb_phase == "stealing" then keyboard.Release("e") end
+        glue_active     = false
+        ptb_phase       = "idle"
+        ptb_retries     = 0
+        ptb_return_pos  = nil
+        tween_start_pos = nil
+        ret_tween_start = nil
+        ret_use_tween   = false
+        info_tp_status  = "Teleport disabled"
         return
     end
 
@@ -514,7 +723,7 @@ cheat.register("onUpdate", function()
 
     if ptb_phase == "returning" then
         if ret_use_tween and ret_tween_start then
-            local ret_dur  = ui.getValue(TAB, TP, "Return Time (sec)")
+            local ret_dur  = ui.getValue(TAB, FEAT, "Return Time (sec)")
             local elapsed  = now_sec() - ret_tween_start_time
             local progress = math.min(elapsed / ret_dur, 1.0)
             local alpha    = 1 - (1 - progress) ^ 3
@@ -550,7 +759,7 @@ cheat.register("onUpdate", function()
             if ptb_phase == "stealing" then keyboard.Release("e") end
             ptb_retries          = 0
             tween_start_pos      = nil
-            ret_use_tween        = ui.getValue(TAB, TP, "Travel Mode") == 1
+            ret_use_tween        = ui.getValue(TAB, FEAT, "Travel Mode") == 1
             ret_tween_start      = hrp.Position
             ret_tween_start_time = now_sec()
             ptb_phase            = "returning"
@@ -562,10 +771,10 @@ cheat.register("onUpdate", function()
         return
     end
 
-    local mode     = ui.getValue(TAB, TP, "TP Mode")
-    local dwell    = ui.getValue(TAB, TP, "Dwell Time (sec)")
-    local preserve = ui.getValue(TAB, TP, "Preserve Momentum")
-    local clicked  = hotkey_clicked("Teleport Key")
+    local mode     = ui.getValue(TAB, FEAT, "TP Mode")
+    local dwell    = ui.getValue(TAB, FEAT, "Dwell Time (sec)")
+    local preserve = ui.getValue(TAB, FEAT, "Preserve Momentum")
+    local clicked  = hotkey_clicked("Teleport Key", FEAT)
 
     if mode == 0 then
         if clicked then
@@ -583,8 +792,8 @@ cheat.register("onUpdate", function()
         end
 
     elseif mode == 1 then
-        if hotkey_is_hold("Teleport Key") then
-            glue_active = ui.getValue(TAB, TP, "Teleport Key") == true
+        if hotkey_is_hold("Teleport Key", FEAT) then
+            glue_active = ui.getValue(TAB, FEAT, "Teleport Key") == true
         elseif clicked then
             glue_active = not glue_active
         end
@@ -599,7 +808,7 @@ cheat.register("onUpdate", function()
         end
 
     else
-        local use_tween = ui.getValue(TAB, TP, "Travel Mode") == 1
+        local use_tween = ui.getValue(TAB, FEAT, "Travel Mode") == 1
 
         local is_local_holding = holder_char and local_char and holder_char.Name == local_char.Name
         local enemy_hrp = nil
@@ -683,9 +892,10 @@ cheat.register("onUpdate", function()
                 return
             end
         end
+
         if ptb_phase == "tweening" then
             local elapsed  = now_sec() - tween_start_time
-            local tw_dur   = ui.getValue(TAB, TP, "Tween Time (sec)")
+            local tw_dur   = ui.getValue(TAB, FEAT, "Tween Time (sec)")
             local progress = math.min(elapsed / tw_dur, 1.0)
             local alpha    = 1 - (1 - progress) ^ 3
 
@@ -730,7 +940,7 @@ cheat.register("onUpdate", function()
                 pcall(function() hrp.Position = enemy_hrp.Position end)
             end
             keyboard.Press("e")
-            local steal_dwell = ui.getValue(TAB, TP, "Steal Dwell (sec)")
+            local steal_dwell = ui.getValue(TAB, FEAT, "Steal Dwell (sec)")
             local elapsed     = now_sec() - ptb_dwell_start
             if elapsed >= steal_dwell then
                 keyboard.Release("e")
@@ -761,8 +971,8 @@ cheat.register("onUpdate", function()
                 pcall(function() hrp.Position = ball_approach_target() end)
             end
             if elapsed >= dwell then
-                local retry_on = ui.getValue(TAB, TP, "Retry on Miss")
-                local max_r    = ui.getValue(TAB, TP, "Max Retries")
+                local retry_on = ui.getValue(TAB, FEAT, "Retry on Miss")
+                local max_r    = ui.getValue(TAB, FEAT, "Max Retries")
                 if retry_on and ptb_retries < max_r then
                     ptb_retries = ptb_retries + 1
                     if use_tween then
@@ -792,7 +1002,79 @@ cheat.register("onUpdate", function()
     end
 end)
 
--- [Visuals paint]
+-- [Update: auto goal]
+
+cheat.register("onUpdate", function()
+    if not ui.getValue(TAB, FEAT, "Auto Goal") then
+        auto_goal_active = false
+        return
+    end
+
+    if hotkey_is_hold("Auto Goal Key", FEAT) then
+        auto_goal_active = ui.getValue(TAB, FEAT, "Auto Goal Key") == true
+    elseif hotkey_clicked("Auto Goal Key", FEAT) then
+        auto_goal_active = not auto_goal_active
+    end
+
+    if not auto_goal_active then return end
+
+    local ball = world_ball
+              or (held_ball and held_ball.Parent and held_ball)
+              or (free_ball and free_ball.Parent and free_ball)
+    if not ball then return end
+
+    local target_idx = ui.getValue(TAB, FEAT, "Goal Target")
+
+    if target_idx == 0 then
+        local player_team = ""
+        pcall(function()
+            local lp = game.LocalPlayer
+            if lp and lp.Team then player_team = tostring(lp.Team) end
+        end)
+        if player_team == "" then return end
+
+        local goals_f = game.Workspace:FindFirstChild("Goals")
+        if not goals_f then return end
+
+        local goal_parts = {}
+        for _, c in ipairs(goals_f:GetChildren()) do
+            if c.ClassName == "Part" or c.ClassName == "MeshPart" then
+                goal_parts[#goal_parts + 1] = c
+            end
+        end
+
+        local on_team = false
+        for _, g in ipairs(goal_parts) do
+            if g.Name == player_team then on_team = true; break end
+        end
+        if not on_team then return end
+
+        for _, g in ipairs(goal_parts) do
+            if g.Name == player_team then
+                pcall(function()
+                    ball.Position = g.Position
+                    ball.Velocity = Vector3.new(0, 0, 0)
+                end)
+                return
+            end
+        end
+        return
+    end
+
+    local target_name = (target_idx == 1) and "Home" or "Away"
+    local goals_f     = game.Workspace:FindFirstChild("Goals")
+    local goal_part   = goals_f and goals_f:FindFirstChild(target_name)
+    if not goal_part then return end
+
+    local ok, pos = pcall(function() return goal_part.Position end)
+    if not ok or not pos then return end
+    pcall(function()
+        ball.Position = pos
+        ball.Velocity = Vector3.new(0, 0, 0)
+    end)
+end)
+
+-- [Paint: cam axes + draw]
 
 local function get_part_hull(part)
     local corners = draw.GetPartCorners(part)
@@ -822,6 +1104,11 @@ local function draw_hull_fill(hull, color, alpha)
 end
 
 cheat.register("onPaint", function()
+    local fwx, fwz, rx, rz = get_cam_axes()
+    if fwx ~= nil then
+        cam_fwx, cam_fwz, cam_rx, cam_rz = fwx, fwz, rx, rz
+    end
+
     local font = VIS_FONTS[(ui.getValue(TAB, VIS, "Font") or 0) + 1] or "Tahoma"
 
     local display = world_ball
@@ -834,25 +1121,29 @@ cheat.register("onPaint", function()
 
     if ui.getValue(TAB, VIS, "Info Display") then
         local _sw, sh = cheat.GetWindowSize()
-        local x, y = 10, sh - 115
-        local gg_target_idx   = ui.getValue(TAB, TP, "Goal Target")
+        local x, y = 10, sh - 145
+        local gg_target_idx   = ui.getValue(TAB, FEAT, "Goal Target")
         local gg_target_names = {"Auto", "Home", "Away"}
         local gg_label = auto_goal_active
             and ("On -> " .. (gg_target_names[gg_target_idx + 1] or "?"))
             or "Off"
-        local spd_label = ui.getValue(TAB, SPD, "Speed Enabled")
-            and (speed_active and "On" or "Ready")
-            or "Off"
-        local arc_label = ui.getValue(TAB, SPD, "Ball Arc")
-            and (arc_active and "On" or "Ready")
-            or "Off"
-        draw.TextOutlined("BL:R", x, y, COLOR_BLUE, font, 255)
-        draw.TextOutlined("Speed:  " .. tostring(info_speed) .. " (" .. ball_status .. ")", x, y + 15, COLOR_WHITE, font, 255)
-        draw.TextOutlined("Dist:   " .. info_dist,      x, y + 30, COLOR_WHITE, font, 255)
-        draw.TextOutlined("TP:     " .. info_tp_status,  x, y + 45, COLOR_WHITE, font, 255)
-        draw.TextOutlined("Goal:   " .. gg_label,        x, y + 60, COLOR_WHITE, font, 255)
-        draw.TextOutlined("SpeedX: " .. spd_label,       x, y + 75, COLOR_WHITE, font, 255)
-        draw.TextOutlined("Arc:    " .. arc_label,        x, y + 90, COLOR_WHITE, font, 255)
+        local spd_label = ui.getValue(TAB, FEAT, "Speed Enabled")
+            and (speed_active and "On" or "Ready") or "Off"
+        local arc_label = ui.getValue(TAB, FEAT, "Ball Arc")
+            and (arc_active and "On" or "Ready") or "Off"
+        local orb_label = ui.getValue(TAB, MAN, "Orbit Enabled")
+            and (orbit_active and "On" or "Ready") or "Off"
+        local bc_label  = ui.getValue(TAB, MAN, "BC Enabled")
+            and (bc_active and "On" or "Ready") or "Off"
+        draw.TextOutlined("BL:R",                                                     x, y,       COLOR_BLUE,  font, 255)
+        draw.TextOutlined("Speed:  " .. tostring(info_speed) .. " (" .. ball_status .. ")", x, y+15,  COLOR_WHITE, font, 255)
+        draw.TextOutlined("Dist:   " .. info_dist,                                    x, y+30,  COLOR_WHITE, font, 255)
+        draw.TextOutlined("TP:     " .. info_tp_status,                               x, y+45,  COLOR_WHITE, font, 255)
+        draw.TextOutlined("Goal:   " .. gg_label,                                     x, y+60,  COLOR_WHITE, font, 255)
+        draw.TextOutlined("SpeedX: " .. spd_label,                                    x, y+75,  COLOR_WHITE, font, 255)
+        draw.TextOutlined("Arc:    " .. arc_label,                                    x, y+90,  COLOR_WHITE, font, 255)
+        draw.TextOutlined("Orbit:  " .. orb_label,                                    x, y+105, COLOR_WHITE, font, 255)
+        draw.TextOutlined("BC:     " .. bc_label,                                     x, y+120, COLOR_WHITE, font, 255)
     end
 
     local ball_esp_on  = ui.getValue(TAB, VIS, "Ball ESP")
@@ -934,87 +1225,19 @@ cheat.register("onPaint", function()
     end
 end)
 
--- [Auto Goal logic]
-
-cheat.register("onUpdate", function()
-    if not ui.getValue(TAB, TP, "Auto Goal") then
-        auto_goal_active = false
-        return
-    end
-
-    if hotkey_is_hold("Auto Goal Key") then
-        auto_goal_active = ui.getValue(TAB, TP, "Auto Goal Key") == true
-    elseif hotkey_clicked("Auto Goal Key") then
-        auto_goal_active = not auto_goal_active
-    end
-
-    if not auto_goal_active then return end
-
-    local ball = world_ball
-              or (held_ball and held_ball.Parent and held_ball)
-              or (free_ball and free_ball.Parent and free_ball)
-    if not ball then return end
-
-    local target_idx = ui.getValue(TAB, TP, "Goal Target")
-
-    if target_idx == 0 then
-        local player_team = ""
-        pcall(function()
-            local lp = game.LocalPlayer
-            if lp and lp.Team then player_team = tostring(lp.Team) end
-        end)
-        if player_team == "" then return end
-
-        local goals_f = game.Workspace:FindFirstChild("Goals")
-        if not goals_f then return end
-
-        local goal_parts = {}
-        for _, c in ipairs(goals_f:GetChildren()) do
-            if c.ClassName == "Part" or c.ClassName == "MeshPart" then
-                goal_parts[#goal_parts + 1] = c
-            end
-        end
-
-        local on_team = false
-        for _, g in ipairs(goal_parts) do
-            if g.Name == player_team then on_team = true; break end
-        end
-        if not on_team then return end
-
-        for _, g in ipairs(goal_parts) do
-            if g.Name == player_team then
-                pcall(function()
-                    ball.Position = g.Position
-                    ball.Velocity = Vector3.new(0, 0, 0)
-                end)
-                return
-            end
-        end
-        return
-    end
-
-    local target_name = (target_idx == 1) and "Home" or "Away"
-    local goals_f     = game.Workspace:FindFirstChild("Goals")
-    local goal_part   = goals_f and goals_f:FindFirstChild(target_name)
-    if not goal_part then return end
-
-    local ok, pos = pcall(function() return goal_part.Position end)
-    if not ok or not pos then return end
-    pcall(function()
-        ball.Position = pos
-        ball.Velocity = Vector3.new(0, 0, 0)
-    end)
-end)
-
--- [Cleanup]
+-- [Shutdown]
 
 cheat.register("shutdown", function()
+    if ptb_phase == "stealing" then keyboard.Release("e") end
+    keyboard.Release("e")
     free_ball          = nil
     held_ball          = nil
     world_ball         = nil
     holder_char        = nil
     local_char         = nil
     goal_boxes         = {}
+    orbit_active       = false
+    bc_active          = false
     glue_active        = false
     auto_goal_active   = false
     ptb_phase          = "idle"
@@ -1024,6 +1247,5 @@ cheat.register("shutdown", function()
     ret_tween_start    = nil
     ret_use_tween      = false
     flat_lock_y        = nil
-    keyboard.Release("e")
-    config_save()
+    if not config_deleted then config_save() end
 end)
