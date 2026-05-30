@@ -192,6 +192,7 @@ local ball_status    = "---"
 local goal_boxes     = {}
 local player_gks     = {}  -- {name, in_penalty} for each real-player GK this tick
 local live_ball_center = nil  -- set each onPaint frame from GetPartCorners (live CFrame)
+local live_ball_part   = nil  -- the part that yielded live_ball_center (reused by box ESP)
 
 local COLOR_WHITE  = Color3.new(1, 1, 1)
 local COLOR_BLUE   = Color3.fromHex("#3E79A7")
@@ -1579,6 +1580,7 @@ cheat.register("onPaint", function()
     -- Compute live ball center from GetPartCorners (reads render-thread CFrame, not stale .Position)
     do
         live_ball_center = nil
+        live_ball_part   = nil
         local bp
         if local_has_ball and local_char and local_char.Parent then
             -- local player holds ball: read from character's ball part (avoids stale Football.Position)
@@ -1597,6 +1599,7 @@ cheat.register("onPaint", function()
             bp = free_ball
         end
         if bp then
+            live_ball_part = bp
             local corners = draw.GetPartCorners(bp)
             if corners and #corners > 0 then
                 local cx, cy, cz = 0, 0, 0
@@ -1782,15 +1785,7 @@ cheat.register("onPaint", function()
         local ball_fill_color = picker_to_color3(ball_fill_t)
         local ball_fill_alpha = ball_fill_t.a or 60
 
-        local ball_part
-        if held_ball and held_ball.Parent then
-            ball_part = held_ball
-        elseif holder_char and holder_char.Parent then
-            ball_part = holder_char:FindFirstChild("Football")
-                     or holder_char:FindFirstChild("Hitbox")
-        else
-            ball_part = world_ball
-        end
+        local ball_part = live_ball_part
 
         if ball_part then
             local hull = get_part_hull(ball_part)
