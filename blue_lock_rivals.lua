@@ -1315,8 +1315,8 @@ cheat.register("onPaint", function()
     end
 
     local goal_esp_on  = ui.getValue(TAB, VIS, "Goal ESP")
-    local goal_fill_on = ui.getValue(TAB, VIS, "Goal Fill")
-    if goal_esp_on or goal_fill_on then
+    local goal_fill_on = goal_esp_on and ui.getValue(TAB, VIS, "Goal Fill")
+    if goal_esp_on then
         local home_col_t    = ui.getValue(TAB, VIS, "Home Color") or {}
         local away_col_t    = ui.getValue(TAB, VIS, "Away Color") or {}
         local home_color    = picker_to_color3(home_col_t)
