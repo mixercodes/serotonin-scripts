@@ -1580,10 +1580,17 @@ cheat.register("onPaint", function()
     do
         live_ball_center = nil
         local bp
-        if held_ball and held_ball.Parent then
+        if local_has_ball and local_char and local_char.Parent then
+            -- local player holds ball: read from character's ball part (avoids stale Football.Position)
+            bp = local_char:FindFirstChild("PlrFootball")
+              or local_char:FindFirstChild("Hitbox")
+              or (held_ball and held_ball.Parent and held_ball)
+        elseif held_ball and held_ball.Parent then
             bp = held_ball
         elseif holder_char and holder_char.Parent then
-            bp = holder_char:FindFirstChild("Football") or holder_char:FindFirstChild("Hitbox")
+            bp = holder_char:FindFirstChild("PlrFootball")
+              or holder_char:FindFirstChild("Football")
+              or holder_char:FindFirstChild("Hitbox")
         elseif world_ball and world_ball.Parent then
             bp = world_ball
         elseif free_ball and free_ball.Parent then
