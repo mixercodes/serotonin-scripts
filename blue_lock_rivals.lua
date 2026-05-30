@@ -16,7 +16,6 @@ local sin, cos   = math.sin, math.cos
 local CONFIG_FILE = "blr_config.lua"
 
 local config_save, config_load  -- forward declarations for button callbacks
-local config_deleted = false
 
 ui.newTab(TAB, "BL:R")
 
@@ -76,7 +75,7 @@ ui.NewColorpicker(TAB, VIS, "Home Fill Color", {r=0, g=180, b=255, a=40},    tru
 ui.NewColorpicker(TAB, VIS, "Away Fill Color", {r=255, g=80, b=80, a=40},    true)
 ui.NewButton(TAB, VIS, "Save Config",   function() config_save() end)
 ui.NewButton(TAB, VIS, "Load Config",   function() config_load() end)
-ui.NewButton(TAB, VIS, "Delete Config", function() file.delete(CONFIG_FILE); config_deleted = true end)
+ui.NewButton(TAB, VIS, "Delete Config", function() file.delete(CONFIG_FILE) end)
 
 -- [Defaults]
 ui.setValue(TAB, MAN, "Orbit Enabled", false)
@@ -1243,5 +1242,4 @@ cheat.register("shutdown", function()
     ret_tween_start    = nil
     ret_use_tween      = false
     flat_lock_y        = nil
-    if not config_deleted then config_save() end
 end)

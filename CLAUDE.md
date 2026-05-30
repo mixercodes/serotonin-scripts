@@ -165,9 +165,9 @@ These features do **not** exist in the runtime:
 These behaviors have been confirmed in production scripts:
 
 - `utility.GetMousePos()` returns `{[1]=x, [2]=y}` — access as `mpos[1]`, `mpos[2]`, not `.x`/`.y`
-- `ui.getValue` on dropdowns returns **1-based** index — use `options[idx]` to index into a Lua table. `0` means no selection (nothing chosen yet).
-- `ui.setValue` on dropdowns is **1-based** — pass `1` for the first item, `2` for the second, etc.
-- `ui.newDropdown` 5th arg (default) is also **1-based** — pass `1` for the first item, `2` for the second. All three (getValue, setValue, 5th arg default) are consistently 1-based.
+- `ui.getValue` on dropdowns returns **0-based** index — `0` = first item, `1` = second item, etc. Use `options[idx + 1]` to index into a Lua table.
+- `ui.setValue` on dropdowns is **0-based** — pass `0` for the first item, `1` for the second, etc.
+- `ui.newDropdown` 5th arg (default) is also **0-based**. All three (getValue, setValue, 5th arg default) are consistently 0-based. (Previously documented as 1-based — confirmed incorrect via live test; 1-based conversion broke dropdown logic in production.)
 - `ui.setValue` works at top-level after widget creation for setting defaults. For sliders, when the type stub flags the 6th arg (default) of `newSliderFloat` as a mismatch, omit the 6th arg and set the default via `ui.setValue` instead — runtime accepts it either way.
 - `loadstring(str)()` works for dynamic code execution
 - `ui.NewColorpicker(... inLine=true)` attaches to the **immediately preceding widget in declaration order** — declare each colorpicker directly after its paired widget, not at the end of the block
