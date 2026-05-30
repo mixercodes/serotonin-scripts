@@ -1087,22 +1087,10 @@ cheat.register("onUpdate", function()
 
         local glue_block = nil
         if gk_has_ball then
-            glue_block = "AI GK has ball"
+            glue_block = "Ball held by AI"
         elseif holder_char and holder_char.Parent and not is_local_holding then
-            local ok_b, reason = pcall(function()
-                local players_svc = game.GetService("Players")
-                local vals   = holder_char:FindFirstChild("Values")
-                local goalie = vals and vals:FindFirstChild("Goalie")
-                if goalie and (goalie.Value == true or goalie.Value == 1) then
-                    local is_real = players_svc and players_svc:FindFirstChild(holder_char.Name)
-                    if not is_real then return "AI GK has ball" end
-                    local in_pen = vals and vals:FindFirstChild("IsInPenalty")
-                    return (in_pen and (in_pen.Value == true or in_pen.Value == 1))
-                        and "GK in box" or "GK has ball"
-                end
-                return holder_char.Name .. " has ball"
-            end)
-            glue_block = ok_b and reason or "Player has ball"
+            local ok_b, name = pcall(function() return holder_char.Name end)
+            glue_block = "Ball held by " .. (ok_b and name or "another player")
         end
 
         if glue_block then
