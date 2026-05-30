@@ -1080,7 +1080,35 @@ cheat.register("onUpdate", function()
         elseif clicked then
             glue_active = not glue_active
         end
-        if glue_active then
+
+        -- Block if any non-local player holds the ball
+        local is_local_holding = local_has_ball
+            or (holder_char and local_char and holder_char.Name == local_char.Name)
+
+        local glue_block = nil
+        if gk_has_ball then
+            glue_block = "AI GK has ball"
+        elseif holder_char and holder_char.Parent and not is_local_holding then
+            local ok_b, reason = pcall(function()
+                local players_svc = game.GetService("Players")
+                local vals   = holder_char:FindFirstChild("Values")
+                local goalie = vals and vals:FindFirstChild("Goalie")
+                if goalie and (goalie.Value == true or goalie.Value == 1) then
+                    local is_real = players_svc and players_svc:FindFirstChild(holder_char.Name)
+                    if not is_real then return "AI GK has ball" end
+                    local in_pen = vals and vals:FindFirstChild("IsInPenalty")
+                    return (in_pen and (in_pen.Value == true or in_pen.Value == 1))
+                        and "GK in box" or "GK has ball"
+                end
+                return holder_char.Name .. " has ball"
+            end)
+            glue_block = ok_b and reason or "Player has ball"
+        end
+
+        if glue_block then
+            glue_active = false
+            set_tp_status(glue_block, false)
+        elseif glue_active then
             local ok = pcall(function()
                 ball.Position = front_target(hrp)
                 ball.Velocity = Vector3.new(0, 0, 0)
