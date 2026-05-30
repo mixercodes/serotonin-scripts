@@ -351,18 +351,45 @@ local function refresh_ball_refs()
         if ok and on_pl and char_val and char_val.Parent then
             holder_char = char_val
             held_ball   = world_ball
-            -- GK lives under game.Workspace.AI.<team>.GK
+            -- AI GK models are not in the Players service; real players are
             local ok2, is_ai = pcall(function()
-                return char_val.Parent and char_val.Parent.Parent
-                    and char_val.Parent.Parent.Name == "AI"
+                local players_svc = game.GetService("Players")
+                if players_svc and players_svc:FindFirstChild(char_val.Name) then
+                    return false
+                end
+                local vals   = char_val:FindFirstChild("Values")
+                local goalie = vals and vals:FindFirstChild("Goalie")
+                return goalie and (goalie.Value == true or goalie.Value == 1)
             end)
             if ok2 and is_ai then
                 gk_has_ball = true
-                ball_status = "GK (held)"
+                ball_status = "AI GK (held)"
             else
                 ball_status = char_val.Name .. " (held)"
             end
             return
+        end
+    end
+
+    -- fallback: scan AI GK models directly for HasBall (covers cases where Football.Char is unset)
+    local ai_folder = game.Workspace:FindFirstChild("AI")
+    if ai_folder then
+        for _, team_folder in ipairs(ai_folder:GetChildren()) do
+            local gk_model = team_folder:FindFirstChild("GK")
+            if gk_model then
+                local ok3, has_it = pcall(function()
+                    local vals = gk_model:FindFirstChild("Values")
+                    local hb   = vals and vals:FindFirstChild("HasBall")
+                    return hb and (hb.Value == true or hb.Value == 1)
+                end)
+                if ok3 and has_it then
+                    gk_has_ball = true
+                    held_ball   = world_ball
+                    holder_char = gk_model
+                    ball_status = "AI GK (held)"
+                    return
+                end
+            end
         end
     end
 
@@ -1047,18 +1074,26 @@ cheat.register("onUpdate", function()
         local gk_block_reason = ""
         if gk_has_ball then
             gk_block = true
-            gk_block_reason = "GK has ball"
+            gk_block_reason = "AI GK has ball"
         elseif holder_char and holder_char.Parent and not is_local_holding then
-            local ok_gk, real_gk_in_box = pcall(function()
+            local ok_gk, block_msg = pcall(function()
                 local vals   = holder_char:FindFirstChild("Values")
                 local goalie = vals and vals:FindFirstChild("Goalie")
+                if not (goalie and (goalie.Value == true or goalie.Value == 1)) then return nil end
+                -- AI GKs are not in the Players service; real players are
+                local players_svc = game.GetService("Players")
+                local is_real = players_svc and players_svc:FindFirstChild(holder_char.Name)
+                if not is_real then return "AI GK has ball" end
+                -- Real player GK: only block while they are inside the penalty box
                 local in_pen = vals and vals:FindFirstChild("IsInPenalty")
-                return (goalie and (goalie.Value == true or goalie.Value == 1))
-                    and (in_pen and (in_pen.Value == true or in_pen.Value == 1))
+                if in_pen and (in_pen.Value == true or in_pen.Value == 1) then
+                    return "GK in box"
+                end
+                return nil
             end)
-            if ok_gk and real_gk_in_box then
+            if ok_gk and block_msg then
                 gk_block = true
-                gk_block_reason = "GK in box"
+                gk_block_reason = block_msg
             end
         end
         if gk_block then
@@ -1505,7 +1540,13 @@ cheat.register("onPaint", function()
     local ol_ind = _ol[4]; local ol_arrow = _ol[5]; local ol_snap  = _ol[6]
     local ol_trail = _ol[7]
 
-    if holder_char and holder_char.Parent then
+    if local_has_ball and local_char then
+        local ok, v = pcall(function()
+            local hrp = local_char:FindFirstChild("HumanoidRootPart")
+            return hrp and hrp.Velocity.Magnitude
+        end)
+        info_speed = ok and v and math.floor(v * 10) / 10 or 0
+    elseif holder_char and holder_char.Parent then
         local ok, v = pcall(function()
             local hrp = holder_char:FindFirstChild("HumanoidRootPart")
             return hrp and hrp.Velocity.Magnitude
@@ -1536,7 +1577,8 @@ cheat.register("onPaint", function()
         end
 
         add("BL:R", COLOR_BLUE)
-        add(tostring(info_speed) .. " st/s  " .. ball_status)
+        local display_status = local_has_ball and "You (held)" or ball_status
+        add(tostring(info_speed) .. " st/s  " .. display_status)
         add("Dist  " .. info_dist)
 
         if ui.getValue(TAB, FEAT, "Teleport Enabled") then
