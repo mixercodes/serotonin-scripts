@@ -34,6 +34,9 @@ ui.NewCheckbox(TAB, MAN, "Auto Dribble")
 ui.newHotkey(TAB, MAN, "Dribble Key", true)
 ui.newSliderFloat(TAB, MAN, "Dribble Radius", 2.0, 15.0)
 ui.NewCheckbox(TAB, MAN, "Show Radius")
+ui.NewCheckbox(TAB, MAN, "Linger")
+ui.newSliderFloat(TAB, MAN, "Linger Radius",   2.0, 15.0)
+ui.NewSliderInt(TAB, MAN,   "Linger Time (ms)", 50, 500)
 
 -- [Ball Features]
 ui.NewContainer(TAB, FEAT, "Ball Features", { autosize = true, next = true })
@@ -115,7 +118,10 @@ ui.setValue(TAB, MAN, "Move Speed",    15.0)
 ui.setValue(TAB, MAN, "Freeze Player",   true)
 ui.setValue(TAB, MAN, "Auto Dribble",   false)
 ui.setValue(TAB, MAN, "Dribble Radius", 6.0)
-ui.setValue(TAB, MAN, "Show Radius",    true)
+ui.setValue(TAB, MAN, "Show Radius",     true)
+ui.setValue(TAB, MAN, "Linger",          true)
+ui.setValue(TAB, MAN, "Linger Radius",   4.5)
+ui.setValue(TAB, MAN, "Linger Time (ms)", 150)
 
 ui.setValue(TAB, FEAT, "Speed Enabled",     false)
 ui.setValue(TAB, FEAT, "Speed Multiplier",  2.0)
@@ -167,11 +173,12 @@ ui.setValue(TAB, VIS, "ESP Outlines",     {true,true,true,true,true,true,true})
 
 -- [Shared state]
 
-local free_ball   = nil
-local held_ball   = nil
-local world_ball  = nil
-local holder_char = nil
-local local_char  = nil
+local free_ball      = nil
+local held_ball      = nil
+local world_ball     = nil
+local holder_char    = nil
+local local_char     = nil
+local local_has_ball = false
 local prev_vel    = Vector3.new(0, 0, 0)
 local ball_status = "---"
 local goal_boxes  = {}
@@ -216,6 +223,9 @@ local dribble_q_time       = 0
 local dribble_last_q       = 0
 local dribble_enemy_near   = false
 local dribble_enemy_slide  = false
+local dribble_linger_near  = false
+local dribble_linger_slide = false
+local dribble_pos_history  = {}
 local ptb_phase            = "idle"
 local ptb_return_pos       = nil
 local ptb_dwell_start      = 0
@@ -265,6 +275,7 @@ local function picker_to_color3(t)
 end
 
 local function get_ball_pos()
+    if local_has_ball then return nil end
     if held_ball and held_ball.Parent then
         local ok, p = pcall(function() return held_ball.Position end)
         if ok and p then return p end
@@ -410,7 +421,10 @@ local SAVE_WIDGETS = {
     {MAN,  "Auto Dribble",    "val"},
     {MAN,  "Dribble Key",     "hk"},
     {MAN,  "Dribble Radius",  "val"},
-    {MAN,  "Show Radius",     "val"},
+    {MAN,  "Show Radius",      "val"},
+    {MAN,  "Linger",          "val"},
+    {MAN,  "Linger Radius",   "val"},
+    {MAN,  "Linger Time (ms)","val"},
     {FEAT, "Speed Enabled",    "val"},
     {FEAT, "Speed Key",        "hk"},
     {FEAT, "Speed Multiplier", "val"},
@@ -525,6 +539,17 @@ end
 
 config_load()  -- auto-load on startup
 
+-- [Update: local possession (runs every ~5ms so it's ahead of the 33ms ball-ref refresh)]
+
+cheat.register("onUpdate", function()
+    local lp   = game.LocalPlayer
+    local char = lp and game.Workspace:FindFirstChild(lp.Name)
+    local vals = char and char:FindFirstChild("Values")
+    local hb   = vals and vals:FindFirstChild("HasBall")
+    local ok, v = pcall(function() return hb and (hb.Value == true or hb.Value == 1) end)
+    local_has_ball = ok and v or false
+end)
+
 -- [Slow update: goal refs]
 
 cheat.register("onSlowUpdate", refresh_goal_refs)
@@ -538,7 +563,7 @@ cheat.register("onUpdate", function()
     _last_refresh = t
     refresh_ball_refs()
     refresh_local_char()
-    if ui.getValue(TAB, VIS, "Ball Trail") then
+    if ui.getValue(TAB, VIS, "Ball Trail") and not local_has_ball then
         local bp = get_ball_pos()
         if bp then
             trail_positions[#trail_positions + 1] = bp
@@ -646,9 +671,13 @@ cheat.register("onUpdate", function()
     ui.SetVisibility(TAB, VIS, "Trail Length",    trail_on)
 
     local dribble_on = ui.getValue(TAB, MAN, "Auto Dribble")
-    ui.SetVisibility(TAB, MAN, "Dribble Key",    dribble_on)
-    ui.SetVisibility(TAB, MAN, "Dribble Radius", dribble_on)
-    ui.SetVisibility(TAB, MAN, "Show Radius",    dribble_on)
+    local linger_on  = dribble_on and ui.getValue(TAB, MAN, "Linger")
+    ui.SetVisibility(TAB, MAN, "Dribble Key",      dribble_on)
+    ui.SetVisibility(TAB, MAN, "Dribble Radius",   dribble_on)
+    ui.SetVisibility(TAB, MAN, "Show Radius",      dribble_on)
+    ui.SetVisibility(TAB, MAN, "Linger",           dribble_on)
+    ui.SetVisibility(TAB, MAN, "Linger Radius",    linger_on)
+    ui.SetVisibility(TAB, MAN, "Linger Time (ms)", linger_on)
 end)
 
 -- [Update: ball physics (speed / arc)]
@@ -1222,13 +1251,13 @@ end)
 -- [Update: auto dribble]
 
 cheat.register("onUpdate", function()
+    -- release q once its hold duration has elapsed
     if dribble_q_down and (now_sec() - dribble_q_time) >= 0.15 then
         keyboard.Release("q")
         dribble_q_down = false
     end
 
-    local dribble_enabled = ui.getValue(TAB, MAN, "Auto Dribble")
-    if not dribble_enabled then
+    if not ui.getValue(TAB, MAN, "Auto Dribble") then
         if dribble_q_down then keyboard.Release("q"); dribble_q_down = false end
         auto_dribble_active = false
         return
@@ -1240,54 +1269,83 @@ cheat.register("onUpdate", function()
         auto_dribble_active = not auto_dribble_active
     end
 
-    if not auto_dribble_active then
-        if dribble_q_down then keyboard.Release("q"); dribble_q_down = false end
+    if not auto_dribble_active and dribble_q_down then
+        keyboard.Release("q"); dribble_q_down = false
     end
-
-    -- use HasBall from Values folder for accurate possession check
-    local ok_hb, has_ball = pcall(function()
-        local vals = local_char and local_char:FindFirstChild("Values")
-        local hb   = vals and vals:FindFirstChild("HasBall")
-        return hb and (hb.Value == true or hb.Value == 1)
-    end)
 
     local lp   = entity.GetLocalPlayer()
     local lpos = lp and lp:GetBonePosition("HumanoidRootPart")
 
-    -- always scan for HUD even when not active
-    dribble_enemy_near  = false
-    dribble_enemy_slide = false
+    -- scan enemies (always runs so HUD stays live when inactive)
+    dribble_enemy_near   = false
+    dribble_enemy_slide  = false
+    dribble_linger_near  = false
+    dribble_linger_slide = false
 
     if lpos then
-        local radius = ui.getValue(TAB, MAN, "Dribble Radius") or 6.0
+        local now_t      = utility.GetTickCount()
+        local main_r     = ui.getValue(TAB, MAN, "Dribble Radius")    or 6.0
+        local linger_enabled = ui.getValue(TAB, MAN, "Linger")
+        local linger_r   = linger_enabled and (ui.getValue(TAB, MAN, "Linger Radius")    or 4.5)
+        local linger_ms  = linger_enabled and (ui.getValue(TAB, MAN, "Linger Time (ms)") or 150)
+
+        -- update position history and find the past position for the linger zone
+        dribble_pos_history[#dribble_pos_history + 1] = {lpos, now_t}
+        while #dribble_pos_history > 1 and now_t - dribble_pos_history[1][2] > 2000 do
+            table.remove(dribble_pos_history, 1)
+        end
+
+        local linger_pos = nil
+        if linger_enabled then
+            for i = #dribble_pos_history, 1, -1 do
+                if now_t - dribble_pos_history[i][2] >= linger_ms then
+                    linger_pos = dribble_pos_history[i][1]
+                    break
+                end
+            end
+        end
+
         local ok, enemies = pcall(function() return entity.GetPlayers(true) end)
         if ok and enemies then
             for _, enemy in ipairs(enemies) do
-                local ok2, near, sliding = pcall(function()
-                    local epos = enemy:GetBonePosition("HumanoidRootPart")
-                    if not epos or (epos - lpos).Magnitude > radius then return false, false end
-                    local char  = game.Workspace:FindFirstChild(enemy.Name)
-                    local vals  = char and char:FindFirstChild("Values")
-                    if not vals then return true, false end
-                    local sl = vals:FindFirstChild("Sliding")
-                    local st = vals:FindFirstChild("Stealing")
-                    local is_sl = sl and (sl.Value == true or sl.Value == 1)
-                    local is_st = st and (st.Value == true or st.Value == 1)
-                    return true, is_sl or is_st
-                end)
-                if ok2 then
-                    if near  then dribble_enemy_near  = true end
-                    if sliding then dribble_enemy_slide = true end
-                    if dribble_enemy_near and dribble_enemy_slide then break end
+                local epos = enemy:GetBonePosition("HumanoidRootPart")
+                if epos then
+                    local in_main   = (epos - lpos).Magnitude <= main_r
+                    local in_linger = linger_pos and (epos - linger_pos).Magnitude <= linger_r
+
+                    if in_main or in_linger then
+                        if in_main   then dribble_enemy_near  = true end
+                        if in_linger then dribble_linger_near = true end
+
+                        local char = game.Workspace:FindFirstChild(enemy.Name)
+                        local vals = char and char:FindFirstChild("Values")
+                        local sl = vals and vals:FindFirstChild("Sliding")
+                        local st = vals and vals:FindFirstChild("Stealing")
+                        local is_sliding = (sl and (sl.Value == true or sl.Value == 1))
+                                        or (st and (st.Value == true or st.Value == 1))
+
+                        if is_sliding then
+                            if in_main   then dribble_enemy_slide  = true end
+                            if in_linger then dribble_linger_slide = true end
+                        end
+                    end
                 end
+
+                if dribble_enemy_slide and (not linger_pos or dribble_linger_slide) then break end
             end
         end
     end
 
     if not auto_dribble_active then return end
+
+    local ok_hb, has_ball = pcall(function()
+        local vals = local_char and local_char:FindFirstChild("Values")
+        local hb   = vals and vals:FindFirstChild("HasBall")
+        return hb and (hb.Value == true or hb.Value == 1)
+    end)
     if not (ok_hb and has_ball) then return end
 
-    if dribble_enemy_slide and not dribble_q_down then
+    if (dribble_enemy_slide or dribble_linger_slide) and not dribble_q_down then
         local t = now_sec()
         if t - dribble_last_q >= 0.4 then
             keyboard.Press("q")
@@ -1365,35 +1423,50 @@ cheat.register("onPaint", function()
 
         local lines = {}
         local function add(text, col) lines[#lines + 1] = {text, col or COLOR_WHITE} end
+        local function hk_str(container, label)
+            local hk = ui.getHotkey(TAB, container, label)
+            if hk and hk.key and hk.key ~= 0 and hk.key_name and hk.key_name ~= "" then
+                return " [" .. hk.key_name .. "]"
+            end
+            return ""
+        end
 
         add("BL:R", COLOR_BLUE)
         add(tostring(info_speed) .. " st/s  " .. ball_status)
         add("Dist  " .. info_dist)
 
         if ui.getValue(TAB, FEAT, "Teleport Enabled") then
-            add("TP    " .. info_tp_status)
+            add("TP" .. hk_str(FEAT, "Teleport Key") .. "  " .. info_tp_status)
         end
         if ui.getValue(TAB, FEAT, "Auto Goal") then
             local idx   = ui.getValue(TAB, FEAT, "Goal Target")
             local names = {"Auto", "Home", "Away"}
             local label = auto_goal_active and ("On -> " .. (names[idx + 1] or "?")) or "Ready"
-            add("Goal  " .. label, auto_goal_active and COLOR_GREEN or COLOR_YELLOW)
+            add("Goal" .. hk_str(FEAT, "Auto Goal Key") .. "  " .. label, auto_goal_active and COLOR_GREEN or COLOR_YELLOW)
         end
         if ui.getValue(TAB, FEAT, "Speed Enabled") then
-            add("Speed  " .. (speed_active and "On" or "Ready"), speed_active and COLOR_GREEN or COLOR_YELLOW)
+            local state = speed_active and "On" or "Ready"
+            add("Speed" .. hk_str(FEAT, "Speed Key") .. "  " .. state, speed_active and COLOR_GREEN or COLOR_YELLOW)
         end
         if ui.getValue(TAB, FEAT, "Ball Arc") then
-            add("Arc   " .. (arc_active and "On" or "Ready"), arc_active and COLOR_GREEN or COLOR_YELLOW)
+            local state = arc_active and "On" or "Ready"
+            add("Arc" .. hk_str(FEAT, "Arc Key") .. "  " .. state, arc_active and COLOR_GREEN or COLOR_YELLOW)
         end
         if ui.getValue(TAB, MAN, "Orbit Enabled") then
-            add("Orbit " .. (orbit_active and "On" or "Ready"), orbit_active and COLOR_GREEN or COLOR_YELLOW)
+            local state = orbit_active and "On" or "Ready"
+            add("Orbit" .. hk_str(MAN, "Orbit Key") .. "  " .. state, orbit_active and COLOR_GREEN or COLOR_YELLOW)
         end
         if ui.getValue(TAB, MAN, "BC Enabled") then
-            add("BC    " .. (bc_active and "On" or "Ready"), bc_active and COLOR_GREEN or COLOR_YELLOW)
+            local state = bc_active and "On" or "Ready"
+            add("BC" .. hk_str(MAN, "BC Key") .. "  " .. state, bc_active and COLOR_GREEN or COLOR_YELLOW)
         end
         if ui.getValue(TAB, MAN, "Auto Dribble") then
-            add("Near  " .. (dribble_enemy_near  and "YES" or "NO"), dribble_enemy_near  and COLOR_RED or COLOR_GREEN)
-            add("Slide " .. (dribble_enemy_slide and "YES" or "NO"), dribble_enemy_slide and COLOR_RED or COLOR_GREEN)
+            local state    = auto_dribble_active and "On" or "Ready"
+            local any_near = dribble_enemy_near  or dribble_linger_near
+            local any_slide = dribble_enemy_slide or dribble_linger_slide
+            add("Dribble" .. hk_str(MAN, "Dribble Key") .. "  " .. state, auto_dribble_active and COLOR_GREEN or COLOR_YELLOW)
+            add("  Near   " .. (any_near  and "YES" or "NO"), any_near  and COLOR_RED or COLOR_GREEN)
+            add("  Slide  " .. (any_slide and "YES" or "NO"), any_slide and COLOR_RED or COLOR_GREEN)
         end
 
         local base_y = sh - 10
@@ -1408,7 +1481,9 @@ cheat.register("onPaint", function()
         local lpos = lp and lp:GetBonePosition("HumanoidRootPart")
         if lpos then
             local radius   = ui.getValue(TAB, MAN, "Dribble Radius") or 6.0
-            local ring_col = dribble_enemy_near and Color3.fromRGB(255, 80, 80) or Color3.fromRGB(80, 255, 80)
+            local ring_col = dribble_enemy_slide and Color3.fromRGB(255, 50, 50)
+                          or dribble_enemy_near  and Color3.fromRGB(255, 160, 0)
+                          or Color3.fromRGB(80, 255, 80)
             local pts = {}
             for i = 0, 31 do
                 local a  = i * (pi2 / 32)
@@ -1418,6 +1493,34 @@ cheat.register("onPaint", function()
             end
             if #pts >= 2 then
                 draw.Polyline(pts, ring_col, #pts == 32, 1.0, 180)
+            end
+
+            if ui.getValue(TAB, MAN, "Linger") then
+                local linger_ms  = ui.getValue(TAB, MAN, "Linger Time (ms)") or 150
+                local linger_r   = ui.getValue(TAB, MAN, "Linger Radius")    or 4.5
+                local now_t      = utility.GetTickCount()
+                local linger_pos = nil
+                for i = #dribble_pos_history, 1, -1 do
+                    if now_t - dribble_pos_history[i][2] >= linger_ms then
+                        linger_pos = dribble_pos_history[i][1]
+                        break
+                    end
+                end
+                if linger_pos then
+                    local linger_col = dribble_linger_slide and Color3.fromRGB(255, 50, 50)
+                                   or dribble_linger_near  and Color3.fromRGB(255, 160, 0)
+                                   or Color3.fromRGB(80, 255, 80)
+                    local lpts = {}
+                    for i = 0, 31 do
+                        local a  = i * (pi2 / 32)
+                        local wp = Vector3.new(linger_pos.X + cos(a) * linger_r, linger_pos.Y, linger_pos.Z + sin(a) * linger_r)
+                        local ok2, sx2, sy2, on2 = pcall(function() return utility.WorldToScreen(wp) end)
+                        if ok2 and on2 then lpts[#lpts + 1] = {sx2, sy2} end
+                    end
+                    if #lpts >= 2 then
+                        draw.Polyline(lpts, linger_col, #lpts == 32, 1.0, 90)
+                    end
+                end
             end
         end
     end
@@ -1433,14 +1536,16 @@ cheat.register("onPaint", function()
         local ball_fill_color = picker_to_color3(ball_fill_t)
         local ball_fill_alpha = ball_fill_t.a or 60
 
-        local is_local_holding = holder_char and local_char and holder_char.Name == local_char.Name
+        local is_local_holding = local_has_ball
+            or (holder_char and local_char and holder_char.Name == local_char.Name)
         local ball_part
         if is_local_holding then
             -- local player has the ball, skip ESP
+        elseif held_ball and held_ball.Parent then
+            ball_part = held_ball
         elseif holder_char and holder_char.Parent then
             ball_part = holder_char:FindFirstChild("Football")
                      or holder_char:FindFirstChild("Hitbox")
-                     or holder_char:FindFirstChild("HumanoidRootPart")
         else
             ball_part = world_ball
         end
