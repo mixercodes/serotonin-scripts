@@ -188,9 +188,10 @@ local ball_is_stale   = false
 local _ball_track_pos = nil
 local _ball_track_t   = 0
 local prev_vel    = Vector3.new(0, 0, 0)
-local ball_status = "---"
-local goal_boxes  = {}
-local player_gks  = {}  -- {name, in_penalty} for each real-player GK this tick
+local ball_status    = "---"
+local goal_boxes     = {}
+local player_gks     = {}  -- {name, in_penalty} for each real-player GK this tick
+local live_ball_center = nil  -- set each onPaint frame from GetPartCorners (live CFrame)
 
 local COLOR_WHITE  = Color3.new(1, 1, 1)
 local COLOR_BLUE   = Color3.fromHex("#3E79A7")
@@ -682,15 +683,6 @@ cheat.register("onUpdate", function()
             ball_is_stale   = false
             _ball_track_pos = nil
         end
-    end
-    if ui.getValue(TAB, VIS, "Ball Trail") then
-        local bp = get_ball_pos()
-        if bp then
-            trail_positions[#trail_positions + 1] = bp
-            if #trail_positions > 60 then table.remove(trail_positions, 1) end
-        end
-    elseif #trail_positions > 0 then
-        trail_positions = {}
     end
 end)
 
@@ -1584,6 +1576,44 @@ local function draw_hull_fill(hull, color, alpha)
 end
 
 cheat.register("onPaint", function()
+    -- Compute live ball center from GetPartCorners (reads render-thread CFrame, not stale .Position)
+    do
+        live_ball_center = nil
+        local bp
+        if held_ball and held_ball.Parent then
+            bp = held_ball
+        elseif holder_char and holder_char.Parent then
+            bp = holder_char:FindFirstChild("Football") or holder_char:FindFirstChild("Hitbox")
+        elseif world_ball and world_ball.Parent then
+            bp = world_ball
+        elseif free_ball and free_ball.Parent then
+            bp = free_ball
+        end
+        if bp then
+            local corners = draw.GetPartCorners(bp)
+            if corners and #corners > 0 then
+                local cx, cy, cz = 0, 0, 0
+                for _, v in ipairs(corners) do cx = cx + v.X; cy = cy + v.Y; cz = cz + v.Z end
+                local n = #corners
+                live_ball_center = Vector3.new(cx / n, cy / n, cz / n)
+            end
+            if not live_ball_center then
+                local ok, p = pcall(function() return bp.Position end)
+                if ok and p then live_ball_center = p end
+            end
+        end
+    end
+
+    -- Trail accumulation (uses live_ball_center so it tracks correctly even when held)
+    if ui.getValue(TAB, VIS, "Ball Trail") then
+        if live_ball_center then
+            trail_positions[#trail_positions + 1] = live_ball_center
+            if #trail_positions > 60 then table.remove(trail_positions, 1) end
+        end
+    elseif #trail_positions > 0 then
+        trail_positions = {}
+    end
+
     local fwx, fwz, rx, rz = get_cam_axes()
     if fwx ~= nil then
         cam_fwx, cam_fwz, cam_rx, cam_rz = fwx, fwz, rx, rz
@@ -1831,7 +1861,7 @@ cheat.register("onPaint", function()
     shape_breathe_t = shape_breathe_t + shape_dt
 
     if ball_esp_on and ui.getValue(TAB, VIS, "Shape") then
-        local ball_pos = get_ball_pos()
+        local ball_pos = live_ball_center
         if ball_pos then
             local ok, bsx, bsy, bon = pcall(function()
                 return utility.WorldToScreen(ball_pos)
@@ -1931,7 +1961,7 @@ cheat.register("onPaint", function()
 
     -- [Snap Line]
     if ui.getValue(TAB, VIS, "Snap Line") then
-        local ball_pos = get_ball_pos()
+        local ball_pos = live_ball_center
         if ball_pos then
             local sw, sh = cheat.GetWindowSize()
             local ok, bsx, bsy = pcall(function()
@@ -1965,7 +1995,7 @@ cheat.register("onPaint", function()
 
     -- [Velocity Arrow]
     if ui.getValue(TAB, VIS, "Velocity Arrow") then
-        local ball_pos = get_ball_pos()
+        local ball_pos = live_ball_center
         if ball_pos and world_ball and world_ball.Parent then
             local ok_v, vel = pcall(function() return world_ball.Velocity end)
             if ok_v and vel and vel.Magnitude > 0.5 then
@@ -2010,7 +2040,7 @@ cheat.register("onPaint", function()
 
     -- [Off-screen Ball Indicator]
     if ui.getValue(TAB, VIS, "Ball Indicator") then
-        local ball_pos = get_ball_pos()
+        local ball_pos = live_ball_center
         if ball_pos then
             local sw, sh   = cheat.GetWindowSize()
             local cx, cy   = sw * 0.5, sh * 0.5
