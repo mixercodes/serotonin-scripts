@@ -645,11 +645,17 @@ cheat.register("onUpdate", function()
     refresh_ball_refs()
     refresh_local_char()
 
-    -- refresh GK list (real players + AI)
+    -- refresh enemy GK: real player first, AI fallback
     player_gks = {}
-    local ok_pgk, all_pl = pcall(function() return entity.GetPlayers(false) end)
-    if ok_pgk and all_pl then
-        for _, p in ipairs(all_pl) do
+    local lp_team = nil
+    pcall(function()
+        local lp = game.LocalPlayer
+        if lp and lp.Team then lp_team = tostring(lp.Team) end
+    end)
+    local found_real_gk = false
+    local ok_en, enemies = pcall(function() return entity.GetPlayers(true) end)
+    if ok_en and enemies then
+        for _, p in ipairs(enemies) do
             local ok2, is_gk, in_pen = pcall(function()
                 local char = game.Workspace:FindFirstChild(p.Name)
                 local vals = char and char:FindFirstChild("Values")
@@ -659,23 +665,19 @@ cheat.register("onUpdate", function()
                        in_p   and (in_p.Value   == true or in_p.Value   == 1)
             end)
             if ok2 and is_gk then
-                local lp = game.LocalPlayer
-                local display_name = (lp and p.Name == lp.Name) and "You" or p.Name
-                player_gks[#player_gks + 1] = {name = display_name, in_penalty = in_pen, is_ai = false}
+                player_gks[#player_gks + 1] = {name = p.Name, in_penalty = in_pen, is_ai = false}
+                found_real_gk = true
+                break
             end
         end
     end
-    local ai_folder = game.Workspace:FindFirstChild("AI")
-    if ai_folder then
-        for _, team_folder in ipairs(ai_folder:GetChildren()) do
-            local gk_model = team_folder:FindFirstChild("GK")
+    if not found_real_gk then
+        local ai_folder = game.Workspace:FindFirstChild("AI")
+        local enemy_team = (lp_team == "Home") and "Away" or (lp_team == "Away") and "Home" or nil
+        if ai_folder and enemy_team then
+            local gk_model = ai_folder:FindFirstChild(enemy_team) and ai_folder:FindFirstChild(enemy_team):FindFirstChild("GK")
             if gk_model then
-                local ok3, in_pen = pcall(function()
-                    local vals = gk_model:FindFirstChild("Values")
-                    local in_p = vals and vals:FindFirstChild("IsInPenalty")
-                    return in_p and (in_p.Value == true or in_p.Value == 1)
-                end)
-                player_gks[#player_gks + 1] = {name = team_folder.Name, in_penalty = ok3 and in_pen, is_ai = true}
+                player_gks[#player_gks + 1] = {name = enemy_team, is_ai = true}
             end
         end
     end
@@ -1711,10 +1713,13 @@ cheat.register("onPaint", function()
         end
         if ui.getValue(TAB, VIS, "Show GK Status") then
             for _, gk in ipairs(player_gks) do
-                local zone_str = gk.in_penalty and "in box" or "OUT of box"
-                local zone_col = gk.in_penalty and COLOR_YELLOW or COLOR_GREEN
-                local tag = gk.is_ai and " [AI]" or ""
-                add("GK " .. gk.name .. tag .. "  " .. zone_str, zone_col)
+                if gk.is_ai then
+                    add("GK [AI]", COLOR_YELLOW)
+                else
+                    local zone_str = gk.in_penalty and "in box" or "OUT of box"
+                    local zone_col = gk.in_penalty and COLOR_YELLOW or COLOR_GREEN
+                    add("GK " .. gk.name .. "  " .. zone_str, zone_col)
+                end
             end
         end
 
