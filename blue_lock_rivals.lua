@@ -218,8 +218,9 @@ local shape_last      = utility.GetTickCount()
 local shape_breathe_t = 0.0
 
 local trail_positions = {}
-local _trail_last_t   = 0
-local _last_ball_center = nil  -- last accepted live_ball_center for snap-rejection
+local _trail_last_t     = 0
+local _ball_was_held    = false  -- possession state last onPaint frame
+local _ball_release_t   = -10000 -- tick when ball last became free (ms)
 
 local hk_prev = {}
 
@@ -1614,18 +1615,17 @@ cheat.register("onPaint", function()
                 if ok and p then live_ball_center = p end
             end
         end
-        -- Reject frames where the center jumps an implausible distance (ball reset snap)
-        -- 50 studs/frame at 60fps = 3000 st/s, far beyond any real ball speed
-        if live_ball_center then
-            if _last_ball_center and (live_ball_center - _last_ball_center).Magnitude > 50 then
-                live_ball_center = nil
-                live_ball_part   = nil
-                _last_ball_center = nil  -- clear so the next frame's reading is accepted fresh
-            else
-                _last_ball_center = live_ball_center
-            end
-        else
-            _last_ball_center = nil
+        -- Suppress ESP for 100ms after any held→free transition while Football
+        -- re-settles to its kicked position (avoids snapping to the reset origin)
+        local now_t       = utility.GetTickCount()
+        local is_held     = local_has_ball or gk_has_ball or (holder_char ~= nil)
+        if _ball_was_held and not is_held then
+            _ball_release_t = now_t
+        end
+        _ball_was_held = is_held
+        if not is_held and (now_t - _ball_release_t) < 100 then
+            live_ball_center = nil
+            live_ball_part   = nil
         end
     end
 
