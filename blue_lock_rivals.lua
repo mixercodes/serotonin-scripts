@@ -683,7 +683,7 @@ cheat.register("onUpdate", function()
             _ball_track_pos = nil
         end
     end
-    if ui.getValue(TAB, VIS, "Ball Trail") and not local_has_ball then
+    if ui.getValue(TAB, VIS, "Ball Trail") then
         local bp = get_ball_pos()
         if bp then
             trail_positions[#trail_positions + 1] = bp
