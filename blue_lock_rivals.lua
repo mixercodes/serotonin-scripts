@@ -173,12 +173,16 @@ ui.setValue(TAB, VIS, "ESP Outlines",     {true,true,true,true,true,true,true})
 
 -- [Shared state]
 
-local free_ball      = nil
-local held_ball      = nil
-local world_ball     = nil
-local holder_char    = nil
-local local_char     = nil
-local local_has_ball = false
+local free_ball       = nil
+local held_ball       = nil
+local world_ball      = nil
+local holder_char     = nil
+local local_char      = nil
+local local_has_ball  = false
+local gk_has_ball     = false
+local ball_is_stale   = false
+local _ball_track_pos = nil
+local _ball_track_t   = 0
 local prev_vel    = Vector3.new(0, 0, 0)
 local ball_status = "---"
 local goal_boxes  = {}
@@ -275,7 +279,7 @@ local function picker_to_color3(t)
 end
 
 local function get_ball_pos()
-    if local_has_ball then return nil end
+    if local_has_ball or ball_is_stale then return nil end
     if held_ball and held_ball.Parent then
         local ok, p = pcall(function() return held_ball.Position end)
         if ok and p then return p end
@@ -335,6 +339,34 @@ local function refresh_ball_refs()
 
     held_ball   = nil
     holder_char = nil
+    gk_has_ball = false
+
+    -- Football.Char / Football.OnPlayer is the authoritative possession signal
+    if world_ball then
+        local ok, on_pl, char_val = pcall(function()
+            local op = world_ball:FindFirstChild("OnPlayer")
+            local ch = world_ball:FindFirstChild("Char")
+            return (op and (op.Value == true or op.Value == 1)), (ch and ch.Value)
+        end)
+        if ok and on_pl and char_val and char_val.Parent then
+            holder_char = char_val
+            held_ball   = world_ball
+            -- GK lives under game.Workspace.AI.<team>.GK
+            local ok2, is_ai = pcall(function()
+                return char_val.Parent and char_val.Parent.Parent
+                    and char_val.Parent.Parent.Name == "AI"
+            end)
+            if ok2 and is_ai then
+                gk_has_ball = true
+                ball_status = "GK (held)"
+            else
+                ball_status = char_val.Name .. " (held)"
+            end
+            return
+        end
+    end
+
+    -- fallback: scan player list for HasBall (covers edge cases)
     local ok_pl, all_players = pcall(function() return entity.GetPlayers(false) end)
     if ok_pl and all_players then
         for _, p in ipairs(all_players) do
@@ -345,7 +377,7 @@ local function refresh_ball_refs()
                 return c, hb and (hb.Value == true or hb.Value == 1)
             end)
             if ok2 and char and is_holding then
-                held_ball   = char:FindFirstChild("Football")
+                held_ball   = world_ball
                 holder_char = char
                 ball_status = p.Name .. " (held)"
                 return
@@ -563,6 +595,34 @@ cheat.register("onUpdate", function()
     _last_refresh = t
     refresh_ball_refs()
     refresh_local_char()
+
+    -- stale detection: GK possession is immediate; otherwise position-based (1s threshold)
+    if local_has_ball then
+        ball_is_stale = false
+        _ball_track_pos = nil
+    elseif gk_has_ball then
+        ball_is_stale = true
+        _ball_track_pos = nil
+    else
+        local raw_pos
+        if held_ball and held_ball.Parent then
+            pcall(function() raw_pos = held_ball.Position end)
+        elseif world_ball and world_ball.Parent then
+            pcall(function() raw_pos = world_ball.Position end)
+        elseif free_ball and free_ball.Parent then
+            pcall(function() raw_pos = free_ball.Position end)
+        end
+        if raw_pos then
+            if not _ball_track_pos or (raw_pos - _ball_track_pos).Magnitude > 0.1 then
+                _ball_track_t = t
+            end
+            _ball_track_pos = raw_pos
+            ball_is_stale   = (t - _ball_track_t) > 1.0
+        else
+            ball_is_stale   = false
+            _ball_track_pos = nil
+        end
+    end
     if ui.getValue(TAB, VIS, "Ball Trail") and not local_has_ball then
         local bp = get_ball_pos()
         if bp then
@@ -979,10 +1039,43 @@ cheat.register("onUpdate", function()
     else
         local use_tween = ui.getValue(TAB, FEAT, "Travel Mode") == 1
 
-        local is_local_holding = holder_char and local_char and holder_char.Name == local_char.Name
+        local is_local_holding = local_has_ball
+            or (holder_char and local_char and holder_char.Name == local_char.Name)
+
+        -- block if GK has the ball and is in their penalty box
+        if gk_has_ball then
+            local ok_ip, in_penalty = pcall(function()
+                local vals = holder_char and holder_char:FindFirstChild("Values")
+                local ip   = vals and vals:FindFirstChild("IsInPenalty")
+                return ip and (ip.Value == true or ip.Value == 1)
+            end)
+            if ok_ip and in_penalty then
+                if ptb_phase ~= "idle" then
+                    if ptb_phase == "stealing" then keyboard.Release("e") end
+                    ptb_retries     = 0
+                    tween_start_pos = nil
+                    ret_tween_start = nil
+                    ptb_phase       = "idle"
+                    ptb_return_pos  = nil
+                end
+                info_tp_status = "GK in box"
+                return
+            end
+        end
+
         local enemy_hrp = nil
-        if holder_char and holder_char.Parent and not is_local_holding then
-            enemy_hrp = holder_char:FindFirstChild("HumanoidRootPart")
+        if holder_char and holder_char.Parent and not is_local_holding and not gk_has_ball then
+            local ok_team, is_enemy = pcall(function()
+                local lp = game.LocalPlayer
+                if not lp or not lp.Team then return true end
+                local players_svc = game.GetService("Players")
+                local hp = players_svc and players_svc:FindFirstChild(holder_char.Name)
+                if not hp or not hp.Team then return true end
+                return lp.Team ~= hp.Team
+            end)
+            if ok_team and is_enemy then
+                enemy_hrp = holder_char:FindFirstChild("HumanoidRootPart")
+            end
         end
 
         local function ball_approach_target()
@@ -1539,8 +1632,8 @@ cheat.register("onPaint", function()
         local is_local_holding = local_has_ball
             or (holder_char and local_char and holder_char.Name == local_char.Name)
         local ball_part
-        if is_local_holding then
-            -- local player has the ball, skip ESP
+        if is_local_holding or ball_is_stale then
+            -- local player holds ball, or ball is frozen (AI holder etc.) — skip ESP
         elseif held_ball and held_ball.Parent then
             ball_part = held_ball
         elseif holder_char and holder_char.Parent then
