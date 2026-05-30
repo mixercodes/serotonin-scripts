@@ -1042,25 +1042,36 @@ cheat.register("onUpdate", function()
         local is_local_holding = local_has_ball
             or (holder_char and local_char and holder_char.Name == local_char.Name)
 
-        -- block if GK has the ball and is in their penalty box
+        -- block if AI GK has the ball, or if a real player GK has it while in the box
+        local gk_block = false
+        local gk_block_reason = ""
         if gk_has_ball then
-            local ok_ip, in_penalty = pcall(function()
-                local vals = holder_char and holder_char:FindFirstChild("Values")
-                local ip   = vals and vals:FindFirstChild("IsInPenalty")
-                return ip and (ip.Value == true or ip.Value == 1)
+            gk_block = true
+            gk_block_reason = "GK has ball"
+        elseif holder_char and holder_char.Parent and not is_local_holding then
+            local ok_gk, real_gk_in_box = pcall(function()
+                local vals   = holder_char:FindFirstChild("Values")
+                local goalie = vals and vals:FindFirstChild("Goalie")
+                local in_pen = vals and vals:FindFirstChild("IsInPenalty")
+                return (goalie and (goalie.Value == true or goalie.Value == 1))
+                    and (in_pen and (in_pen.Value == true or in_pen.Value == 1))
             end)
-            if ok_ip and in_penalty then
-                if ptb_phase ~= "idle" then
-                    if ptb_phase == "stealing" then keyboard.Release("e") end
-                    ptb_retries     = 0
-                    tween_start_pos = nil
-                    ret_tween_start = nil
-                    ptb_phase       = "idle"
-                    ptb_return_pos  = nil
-                end
-                info_tp_status = "GK in box"
-                return
+            if ok_gk and real_gk_in_box then
+                gk_block = true
+                gk_block_reason = "GK in box"
             end
+        end
+        if gk_block then
+            if ptb_phase ~= "idle" then
+                if ptb_phase == "stealing" then keyboard.Release("e") end
+                ptb_retries     = 0
+                tween_start_pos = nil
+                ret_tween_start = nil
+                ptb_phase       = "idle"
+                ptb_return_pos  = nil
+            end
+            info_tp_status = gk_block_reason
+            return
         end
 
         local enemy_hrp = nil
