@@ -1086,16 +1086,17 @@ cheat.register("onUpdate", function()
             or (holder_char and local_char and holder_char.Name == local_char.Name)
 
         local glue_block = nil
-        if is_local_holding then
-            glue_block = "You have the ball"
-        elseif gk_has_ball then
+        if gk_has_ball then
             glue_block = "Ball held by AI"
-        elseif holder_char and holder_char.Parent then
+        elseif holder_char and holder_char.Parent and not is_local_holding then
             local ok_b, name = pcall(function() return holder_char.Name end)
             glue_block = "Ball held by " .. (ok_b and name or "another player")
         end
 
-        if glue_block then
+        if is_local_holding then
+            glue_active = false
+            set_tp_status("You have the ball", nil)
+        elseif glue_block then
             glue_active = false
             set_tp_status(glue_block, false)
         elseif glue_active then
@@ -1176,7 +1177,7 @@ cheat.register("onUpdate", function()
         if ptb_phase == "idle" then
             if clicked then
                 if is_local_holding then
-                    set_tp_status("You have ball", nil)
+                    set_tp_status("You have the ball", nil)
                 else
                     ptb_return_pos = hrp.Position
                     ptb_start_time = now_sec()
@@ -1222,7 +1223,7 @@ cheat.register("onUpdate", function()
                 end
             else
                 if is_local_holding then
-                    set_tp_status("You have ball", nil)
+                    set_tp_status("You have the ball", nil)
                 elseif enemy_hrp then
                     local ok, dist = pcall(function() return (hrp.Position - enemy_hrp.Position).Magnitude end)
                     set_tp_status(ok and string.format("Steal ready (%.0fst)", dist) or "Steal ready", true)
