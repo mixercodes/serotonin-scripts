@@ -62,10 +62,22 @@ ui.NewContainer(TAB, VIS, "Visuals", { autosize = true, next = true })
 ui.newDropdown(TAB, VIS, "Font", VIS_FONTS)
 ui.NewCheckbox(TAB, VIS, "Info Display")
 ui.NewCheckbox(TAB, VIS, "Ball ESP")
+ui.NewCheckbox(TAB, VIS, "Box")
 ui.NewColorpicker(TAB, VIS, "Ball Color",      {r=255, g=255, b=255, a=255}, true)
-ui.NewCheckbox(TAB, VIS, "Ball ESP Text")
 ui.NewCheckbox(TAB, VIS, "Ball Fill")
 ui.NewColorpicker(TAB, VIS, "Ball Fill Color", {r=255, g=255, b=255, a=60},  true)
+ui.NewCheckbox(TAB, VIS, "Ball ESP Text")
+ui.NewCheckbox(TAB, VIS, "Shape")
+ui.NewColorpicker(TAB, VIS, "Shape Color", {r=0, g=120, b=255, a=255}, true)
+ui.NewCheckbox(TAB, VIS, "Shape Fill")
+ui.NewColorpicker(TAB, VIS, "Shape Fill Color", {r=0, g=120, b=255, a=50}, true)
+ui.newDropdown(TAB, VIS, "Shape Type", {"Star of David", "Hexagon", "Circle"})
+ui.newSliderFloat(TAB, VIS, "Shape Size",      10.0, 100.0)
+ui.NewCheckbox(TAB, VIS, "Shape Spin")
+ui.newSliderFloat(TAB, VIS, "Spin Speed",       0.1, 10.0)
+ui.NewCheckbox(TAB, VIS, "Shape Breathe")
+ui.newSliderFloat(TAB, VIS, "Breathe Amount",  0.05, 0.5)
+ui.newSliderFloat(TAB, VIS, "Shape Thickness", 0.5,  6.0)
 ui.NewCheckbox(TAB, VIS, "Goal ESP")
 ui.NewColorpicker(TAB, VIS, "Home Color",      {r=0, g=180, b=255, a=255},   true)
 ui.NewColorpicker(TAB, VIS, "Away Color",      {r=255, g=80, b=80, a=255},   true)
@@ -73,6 +85,18 @@ ui.NewCheckbox(TAB, VIS, "Goal ESP Text")
 ui.NewCheckbox(TAB, VIS, "Goal Fill")
 ui.NewColorpicker(TAB, VIS, "Home Fill Color", {r=0, g=180, b=255, a=40},    true)
 ui.NewColorpicker(TAB, VIS, "Away Fill Color", {r=255, g=80, b=80, a=40},    true)
+ui.NewCheckbox(TAB, VIS, "Ball Indicator")
+ui.NewColorpicker(TAB, VIS, "Indicator Color", {r=29, g=123, b=188, a=164}, true)
+ui.newSliderFloat(TAB, VIS, "Indicator Radius", 20.0, 200.0)
+ui.NewCheckbox(TAB, VIS, "Velocity Arrow")
+ui.NewColorpicker(TAB, VIS, "Arrow Color", {r=255, g=255, b=255, a=255}, true)
+ui.newSliderFloat(TAB, VIS, "Arrow Scale", 0.5, 5.0)
+ui.NewCheckbox(TAB, VIS, "Snap Line")
+ui.NewColorpicker(TAB, VIS, "Snap Color", {r=255, g=255, b=255, a=150}, true)
+ui.NewCheckbox(TAB, VIS, "Ball Trail")
+ui.NewColorpicker(TAB, VIS, "Trail Color", {r=255, g=255, b=255, a=200}, true)
+ui.NewSliderInt(TAB, VIS, "Trail Length", 5, 60)
+ui.NewMultiselect(TAB, VIS, "ESP Outlines", {"Box", "Shape", "Goal", "Indicator", "Arrow", "Snap", "Trail"})
 ui.NewButton(TAB, VIS, "Save Config",   function() config_save() end)
 ui.NewButton(TAB, VIS, "Load Config",   function() config_load() end)
 ui.NewButton(TAB, VIS, "Delete Config", function() file.delete(CONFIG_FILE) end)
@@ -109,11 +133,30 @@ ui.setValue(TAB, FEAT, "Goal Target",       0)
 ui.setValue(TAB, VIS, "Font",          1)
 ui.setValue(TAB, VIS, "Info Display",  true)
 ui.setValue(TAB, VIS, "Ball ESP",      false)
-ui.setValue(TAB, VIS, "Ball ESP Text", true)
+ui.setValue(TAB, VIS, "Box",           false)
 ui.setValue(TAB, VIS, "Ball Fill",     false)
+ui.setValue(TAB, VIS, "Ball ESP Text", true)
+ui.setValue(TAB, VIS, "Shape",         false)
+ui.setValue(TAB, VIS, "Shape Fill",    false)
+ui.setValue(TAB, VIS, "Shape Type",    0)
 ui.setValue(TAB, VIS, "Goal ESP",      false)
 ui.setValue(TAB, VIS, "Goal ESP Text", true)
 ui.setValue(TAB, VIS, "Goal Fill",     false)
+ui.setValue(TAB, VIS, "Shape Size",    30.0)
+ui.setValue(TAB, VIS, "Shape Spin",    false)
+ui.setValue(TAB, VIS, "Spin Speed",    1.0)
+ui.setValue(TAB, VIS, "Shape Breathe",    false)
+ui.setValue(TAB, VIS, "Breathe Amount",   0.2)
+ui.setValue(TAB, VIS, "Shape Thickness",  1.5)
+ui.setValue(TAB, VIS, "Shape Fill",       false)
+ui.setValue(TAB, VIS, "Ball Indicator",    false)
+ui.setValue(TAB, VIS, "Indicator Radius",  60.0)
+ui.setValue(TAB, VIS, "Velocity Arrow",   false)
+ui.setValue(TAB, VIS, "Arrow Scale",      1.0)
+ui.setValue(TAB, VIS, "Snap Line",        false)
+ui.setValue(TAB, VIS, "Ball Trail",       false)
+ui.setValue(TAB, VIS, "Trail Length",     20)
+ui.setValue(TAB, VIS, "ESP Outlines",     {true,true,true,true,true,true,true})
 
 -- [Shared state]
 
@@ -128,6 +171,7 @@ local goal_boxes  = {}
 
 local COLOR_WHITE = Color3.new(1, 1, 1)
 local COLOR_BLUE  = Color3.fromHex("#3E79A7")
+local COLOR_BLACK = Color3.new(0, 0, 0)
 local _screen_buf = {}
 
 local orbit_active = false
@@ -140,6 +184,12 @@ local frozen_x, frozen_y, frozen_z = 0, 0, 0
 
 local cam_fwx, cam_fwz = 0, 1
 local cam_rx,  cam_rz  = 1, 0
+
+local shape_angle     = 0.0
+local shape_last      = utility.GetTickCount()
+local shape_breathe_t = 0.0
+
+local trail_positions = {}
 
 local hk_prev = {}
 
@@ -361,10 +411,16 @@ local SAVE_WIDGETS = {
     {VIS,  "Font",             "val"},
     {VIS,  "Info Display",     "val"},
     {VIS,  "Ball ESP",         "val"},
-    {VIS,  "Ball Color",       "val"},
-    {VIS,  "Ball ESP Text",    "val"},
+    {VIS,  "Box",              "val"},
     {VIS,  "Ball Fill",        "val"},
     {VIS,  "Ball Fill Color",  "val"},
+    {VIS,  "Ball Color",       "val"},
+    {VIS,  "Ball ESP Text",    "val"},
+    {VIS,  "Shape",            "val"},
+    {VIS,  "Shape Fill",       "val"},
+    {VIS,  "Shape Fill Color", "val"},
+    {VIS,  "Shape Color",      "val"},
+    {VIS,  "Shape Type",       "val"},
     {VIS,  "Goal ESP",         "val"},
     {VIS,  "Home Color",       "val"},
     {VIS,  "Away Color",       "val"},
@@ -372,6 +428,26 @@ local SAVE_WIDGETS = {
     {VIS,  "Goal Fill",        "val"},
     {VIS,  "Home Fill Color",  "val"},
     {VIS,  "Away Fill Color",  "val"},
+    {VIS,  "Shape Size",       "val"},
+    {VIS,  "Shape Spin",       "val"},
+    {VIS,  "Spin Speed",       "val"},
+    {VIS,  "Shape Breathe",    "val"},
+    {VIS,  "Breathe Amount",   "val"},
+    {VIS,  "Shape Thickness",  "val"},
+    {VIS,  "Shape Fill",       "val"},
+    {VIS,  "Shape Fill Color", "val"},
+    {VIS,  "Ball Indicator",    "val"},
+    {VIS,  "Indicator Color",  "val"},
+    {VIS,  "Indicator Radius", "val"},
+    {VIS,  "Velocity Arrow",   "val"},
+    {VIS,  "Arrow Color",      "val"},
+    {VIS,  "Arrow Scale",      "val"},
+    {VIS,  "Snap Line",        "val"},
+    {VIS,  "Snap Color",       "val"},
+    {VIS,  "Ball Trail",       "val"},
+    {VIS,  "Trail Color",      "val"},
+    {VIS,  "Trail Length",     "val"},
+    {VIS,  "ESP Outlines",    "val"},
 }
 
 local function ser(v)
@@ -436,6 +512,15 @@ cheat.register("onUpdate", function()
     _last_refresh = t
     refresh_ball_refs()
     refresh_local_char()
+    if ui.getValue(TAB, VIS, "Ball Trail") then
+        local bp = get_ball_pos()
+        if bp then
+            trail_positions[#trail_positions + 1] = bp
+            if #trail_positions > 60 then table.remove(trail_positions, 1) end
+        end
+    elseif #trail_positions > 0 then
+        trail_positions = {}
+    end
 end)
 
 cheat.register("onUpdate", function()
@@ -490,20 +575,49 @@ cheat.register("onUpdate", function()
     ui.SetVisibility(TAB, FEAT, "Goal Target",        auto_g)
 
     local ball_esp  = ui.getValue(TAB, VIS, "Ball ESP")
-    local ball_fill = ball_esp and ui.getValue(TAB, VIS, "Ball Fill")
+    local box_on    = ball_esp and ui.getValue(TAB, VIS, "Box")
+    local shape_on  = ball_esp and ui.getValue(TAB, VIS, "Shape")
+    local spin_on   = shape_on and ui.getValue(TAB, VIS, "Shape Spin")
+    local breathe_on = shape_on and ui.getValue(TAB, VIS, "Shape Breathe")
     local goal_esp  = ui.getValue(TAB, VIS, "Goal ESP")
     local goal_fill = goal_esp and ui.getValue(TAB, VIS, "Goal Fill")
 
-    ui.SetVisibility(TAB, VIS, "Ball Color",      ball_esp)
-    ui.SetVisibility(TAB, VIS, "Ball ESP Text",   ball_esp)
-    ui.SetVisibility(TAB, VIS, "Ball Fill",       ball_esp)
-    ui.SetVisibility(TAB, VIS, "Ball Fill Color", ball_fill)
-    ui.SetVisibility(TAB, VIS, "Home Color",      goal_esp)
-    ui.SetVisibility(TAB, VIS, "Away Color",      goal_esp)
-    ui.SetVisibility(TAB, VIS, "Goal ESP Text",   goal_esp)
-    ui.SetVisibility(TAB, VIS, "Goal Fill",       goal_esp)
-    ui.SetVisibility(TAB, VIS, "Home Fill Color", goal_fill)
-    ui.SetVisibility(TAB, VIS, "Away Fill Color", goal_fill)
+    ui.SetVisibility(TAB, VIS, "Box",              ball_esp)
+    ui.SetVisibility(TAB, VIS, "Ball Color",       ball_esp)
+    ui.SetVisibility(TAB, VIS, "Ball Fill",        box_on)
+    ui.SetVisibility(TAB, VIS, "Ball Fill Color",  box_on)
+    ui.SetVisibility(TAB, VIS, "Ball ESP Text",    box_on)
+    ui.SetVisibility(TAB, VIS, "Shape",            ball_esp)
+    ui.SetVisibility(TAB, VIS, "Shape Color",      ball_esp)
+    ui.SetVisibility(TAB, VIS, "Shape Fill",       shape_on)
+    ui.SetVisibility(TAB, VIS, "Shape Fill Color", shape_on)
+    ui.SetVisibility(TAB, VIS, "Shape Type",       shape_on)
+    ui.SetVisibility(TAB, VIS, "Shape Size",       shape_on)
+    ui.SetVisibility(TAB, VIS, "Shape Spin",       shape_on)
+    ui.SetVisibility(TAB, VIS, "Spin Speed",       spin_on)
+    ui.SetVisibility(TAB, VIS, "Shape Breathe",    shape_on)
+    ui.SetVisibility(TAB, VIS, "Breathe Amount",   breathe_on)
+    ui.SetVisibility(TAB, VIS, "Shape Thickness",  shape_on)
+    ui.SetVisibility(TAB, VIS, "Shape Fill",       shape_on)
+    ui.SetVisibility(TAB, VIS, "Shape Fill Color", shape_fill_on)
+    ui.SetVisibility(TAB, VIS, "Home Color",       goal_esp)
+    ui.SetVisibility(TAB, VIS, "Away Color",       goal_esp)
+    ui.SetVisibility(TAB, VIS, "Goal ESP Text",    goal_esp)
+    ui.SetVisibility(TAB, VIS, "Goal Fill",        goal_esp)
+    ui.SetVisibility(TAB, VIS, "Home Fill Color",  goal_fill)
+    ui.SetVisibility(TAB, VIS, "Away Fill Color",  goal_fill)
+
+    local ind_on   = ui.getValue(TAB, VIS, "Ball Indicator")
+    local arrow_on = ui.getValue(TAB, VIS, "Velocity Arrow")
+    local snap_on  = ui.getValue(TAB, VIS, "Snap Line")
+    local trail_on = ui.getValue(TAB, VIS, "Ball Trail")
+    ui.SetVisibility(TAB, VIS, "Indicator Color",  ind_on)
+    ui.SetVisibility(TAB, VIS, "Indicator Radius", ind_on)
+    ui.SetVisibility(TAB, VIS, "Arrow Color",     arrow_on)
+    ui.SetVisibility(TAB, VIS, "Arrow Scale",     arrow_on)
+    ui.SetVisibility(TAB, VIS, "Snap Color",      snap_on)
+    ui.SetVisibility(TAB, VIS, "Trail Color",     trail_on)
+    ui.SetVisibility(TAB, VIS, "Trail Length",    trail_on)
 end)
 
 -- [Update: ball physics (speed / arc)]
@@ -1076,8 +1190,11 @@ local function get_part_hull(part)
     if not corners then return nil end
     local n = 0
     for _, wp in ipairs(corners) do
-        local sx, sy, on = utility.WorldToScreen(wp)
-        if on then
+        local ok, sx, sy = pcall(function()
+            local x, y = utility.WorldToScreen(wp)
+            return x, y
+        end)
+        if ok and sx and sy then
             n = n + 1
             _screen_buf[n] = _screen_buf[n] or {}
             _screen_buf[n][1] = sx
@@ -1105,6 +1222,11 @@ cheat.register("onPaint", function()
     end
 
     local font = VIS_FONTS[(ui.getValue(TAB, VIS, "Font") or 0) + 1] or "Tahoma"
+
+    local _ol    = ui.getValue(TAB, VIS, "ESP Outlines") or {}
+    local ol_box = _ol[1]; local ol_shape = _ol[2]; local ol_goal  = _ol[3]
+    local ol_ind = _ol[4]; local ol_arrow = _ol[5]; local ol_snap  = _ol[6]
+    local ol_trail = _ol[7]
 
     local display = world_ball
     if display then
@@ -1142,9 +1264,12 @@ cheat.register("onPaint", function()
     end
 
     local ball_esp_on  = ui.getValue(TAB, VIS, "Ball ESP")
-    local ball_fill_on = ui.getValue(TAB, VIS, "Ball Fill")
-    if ball_esp_on or ball_fill_on then
-        local ball_color      = picker_to_color3(ui.getValue(TAB, VIS, "Ball Color"))
+    local box_on       = ball_esp_on and ui.getValue(TAB, VIS, "Box")
+    local ball_fill_on = box_on and ui.getValue(TAB, VIS, "Ball Fill")
+    if box_on or ball_fill_on then
+        local ball_col_t      = ui.getValue(TAB, VIS, "Ball Color") or {}
+        local ball_color      = picker_to_color3(ball_col_t)
+        local ball_alpha      = ball_col_t.a or 255
         local ball_fill_t     = ui.getValue(TAB, VIS, "Ball Fill Color") or {}
         local ball_fill_color = picker_to_color3(ball_fill_t)
         local ball_fill_alpha = ball_fill_t.a or 60
@@ -1164,22 +1289,25 @@ cheat.register("onPaint", function()
         if ball_part then
             local hull = get_part_hull(ball_part)
             if ball_fill_on then draw_hull_fill(hull, ball_fill_color, ball_fill_alpha) end
-            if ball_esp_on  then draw_hull_box(hull, ball_color, 255) end
+            if box_on then
+                if ol_box and hull and #hull >= 2 then draw.Polyline(hull, COLOR_BLACK, true, 3.5, ball_alpha) end
+                draw_hull_box(hull, ball_color, ball_alpha)
+            end
 
-            if ball_esp_on and ui.getValue(TAB, VIS, "Ball ESP Text") then
+            if box_on and ui.getValue(TAB, VIS, "Ball ESP Text") then
                 local ok, sx, sy, on = pcall(function()
                     return utility.WorldToScreen(ball_part.Position + Vector3.new(0, 4, 0))
                 end)
                 if ok and on then
                     local hrp = local_char and local_char:FindFirstChild("HumanoidRootPart")
                     if holder_char and holder_char.Parent then
-                        draw.TextOutlined(holder_char.Name .. " [ball]", sx, sy, ball_color, font, 255)
+                        draw.TextOutlined(holder_char.Name .. " [ball]", sx, sy, ball_color, font, ball_alpha)
                     elseif hrp then
                         local ok2, dist = pcall(function() return (ball_part.Position - hrp.Position).Magnitude end)
                         local label = ok2 and string.format("Ball [%.0f]", dist) or "Ball"
-                        draw.TextOutlined(label, sx, sy, ball_color, font, 255)
+                        draw.TextOutlined(label, sx, sy, ball_color, font, ball_alpha)
                     else
-                        draw.TextOutlined("Ball", sx, sy, ball_color, font, 255)
+                        draw.TextOutlined("Ball", sx, sy, ball_color, font, ball_alpha)
                     end
                 end
             end
@@ -1189,8 +1317,12 @@ cheat.register("onPaint", function()
     local goal_esp_on  = ui.getValue(TAB, VIS, "Goal ESP")
     local goal_fill_on = ui.getValue(TAB, VIS, "Goal Fill")
     if goal_esp_on or goal_fill_on then
-        local home_color    = picker_to_color3(ui.getValue(TAB, VIS, "Home Color"))
-        local away_color    = picker_to_color3(ui.getValue(TAB, VIS, "Away Color"))
+        local home_col_t    = ui.getValue(TAB, VIS, "Home Color") or {}
+        local away_col_t    = ui.getValue(TAB, VIS, "Away Color") or {}
+        local home_color    = picker_to_color3(home_col_t)
+        local away_color    = picker_to_color3(away_col_t)
+        local home_alpha    = home_col_t.a or 255
+        local away_alpha    = away_col_t.a or 255
         local home_fill_t   = ui.getValue(TAB, VIS, "Home Fill Color") or {}
         local away_fill_t   = ui.getValue(TAB, VIS, "Away Fill Color") or {}
         local home_fill_col = picker_to_color3(home_fill_t)
@@ -1202,17 +1334,277 @@ cheat.register("onPaint", function()
             if gb and gb.Parent then
                 local is_home  = entry.name == "Home"
                 local col      = is_home and home_color    or away_color
+                local col_a    = is_home and home_alpha    or away_alpha
                 local fill_col = is_home and home_fill_col or away_fill_col
                 local fill_a   = is_home and (home_fill_t.a or 40) or (away_fill_t.a or 40)
                 local hull = get_part_hull(gb)
                 if goal_fill_on then draw_hull_fill(hull, fill_col, fill_a) end
-                if goal_esp_on  then draw_hull_box(hull, col, 200) end
-                if goal_esp_on and goal_text_on then
-                    local ok, sx, sy, on = pcall(function()
-                        return utility.WorldToScreen(gb.Position + Vector3.new(0, 8, 0))
-                    end)
-                    if ok and on then
-                        draw.TextOutlined(entry.name, sx, sy, col, font, 255)
+                if goal_esp_on then
+                    if ol_goal and hull and #hull >= 2 then draw.Polyline(hull, COLOR_BLACK, true, 3.5, col_a) end
+                    draw_hull_box(hull, col, col_a)
+                end
+                if goal_esp_on and goal_text_on and hull and #hull >= 1 then
+                    local max_x, min_y = -math.huge, math.huge
+                    for _, p in ipairs(hull) do
+                        if p[1] > max_x then max_x = p[1] end
+                        if p[2] < min_y then min_y = p[2] end
+                    end
+                    draw.TextOutlined(entry.name, max_x + 2, min_y - 14, col, font, col_a)
+                end
+            end
+        end
+    end
+
+    -- [Shape ESP]
+    local now_tick = utility.GetTickCount()
+    local shape_dt = math.min((now_tick - shape_last) / 1000.0, 0.1)
+    shape_last      = now_tick
+    shape_breathe_t = shape_breathe_t + shape_dt
+
+    if ball_esp_on and ui.getValue(TAB, VIS, "Shape") then
+        local ball_pos = get_ball_pos()
+        if ball_pos then
+            local ok, bsx, bsy, bon = pcall(function()
+                return utility.WorldToScreen(ball_pos)
+            end)
+            if ok and bon then
+                if ui.getValue(TAB, VIS, "Shape Spin") then
+                    local spd = ui.getValue(TAB, VIS, "Spin Speed")
+                    shape_angle = shape_angle + shape_dt * spd * pi2
+                    if shape_angle > pi2 then shape_angle = shape_angle - pi2 end
+                else
+                    shape_angle = 0
+                end
+
+                local base_size = ui.getValue(TAB, VIS, "Shape Size")
+                local size      = base_size
+                if ui.getValue(TAB, VIS, "Shape Breathe") then
+                    local amt = ui.getValue(TAB, VIS, "Breathe Amount")
+                    size = base_size * (1.0 + amt * sin(shape_breathe_t * pi2))
+                end
+
+                local shape_col_t  = ui.getValue(TAB, VIS, "Shape Color") or {}
+                local shape_color  = picker_to_color3(shape_col_t)
+                local shape_alpha  = shape_col_t.a or 255
+                local shape_idx    = ui.getValue(TAB, VIS, "Shape Type") or 0
+                local thickness    = ui.getValue(TAB, VIS, "Shape Thickness") or 1.5
+                local fill_on      = ui.getValue(TAB, VIS, "Shape Fill")
+                local fill_col_t   = fill_on and (ui.getValue(TAB, VIS, "Shape Fill Color") or {}) or {}
+                local fill_color   = picker_to_color3(fill_col_t)
+                local fill_alpha   = fill_col_t.a or 50
+
+                if shape_idx == 0 then
+                    -- Star of David: two equilateral triangles
+                    local pts1, pts2 = {}, {}
+                    local base = shape_angle - pi * 0.5
+                    for i = 0, 2 do
+                        local a1 = base + i * (pi2 / 3)
+                        local a2 = base + pi / 3 + i * (pi2 / 3)
+                        pts1[i + 1] = {bsx + cos(a1) * size, bsy + sin(a1) * size}
+                        pts2[i + 1] = {bsx + cos(a2) * size, bsy + sin(a2) * size}
+                    end
+                    if fill_on then
+                        draw.ConvexPolyFilled(pts1, fill_color, fill_alpha)
+                        draw.ConvexPolyFilled(pts2, fill_color, fill_alpha)
+                    end
+                    if ol_shape then
+                        draw.Polyline(pts1, COLOR_BLACK, true, thickness + 2, shape_alpha)
+                        draw.Polyline(pts2, COLOR_BLACK, true, thickness + 2, shape_alpha)
+                    end
+                    draw.Polyline(pts1, shape_color, true, thickness, shape_alpha)
+                    draw.Polyline(pts2, shape_color, true, thickness, shape_alpha)
+
+                elseif shape_idx == 1 then
+                    -- Hexagon
+                    local pts = {}
+                    for i = 0, 5 do
+                        local a = shape_angle + i * (pi2 / 6)
+                        pts[i + 1] = {bsx + cos(a) * size, bsy + sin(a) * size}
+                    end
+                    if fill_on then draw.ConvexPolyFilled(pts, fill_color, fill_alpha) end
+                    if ol_shape then draw.Polyline(pts, COLOR_BLACK, true, thickness + 2, shape_alpha) end
+                    draw.Polyline(pts, shape_color, true, thickness, shape_alpha)
+
+                else
+                    -- Circle (32 segments)
+                    local pts = {}
+                    for i = 0, 31 do
+                        local a = i * (pi2 / 32)
+                        pts[i + 1] = {bsx + cos(a) * size, bsy + sin(a) * size}
+                    end
+                    if fill_on then draw.ConvexPolyFilled(pts, fill_color, fill_alpha) end
+                    if ol_shape then draw.Polyline(pts, COLOR_BLACK, true, thickness + 2, shape_alpha) end
+                    draw.Polyline(pts, shape_color, true, thickness, shape_alpha)
+                end
+            end
+        end
+    end
+
+    -- [Ball Trail]
+    if ui.getValue(TAB, VIS, "Ball Trail") and #trail_positions >= 2 then
+        local trail_len   = ui.getValue(TAB, VIS, "Trail Length") or 20
+        local trail_col_t = ui.getValue(TAB, VIS, "Trail Color") or {}
+        local trail_color = picker_to_color3(trail_col_t)
+        local trail_alpha = trail_col_t.a or 200
+        local start_idx   = math.max(1, #trail_positions - trail_len + 1)
+        local pts = {}
+        for i = start_idx, #trail_positions do
+            local ok, tsx, tsy, ton = pcall(function()
+                return utility.WorldToScreen(trail_positions[i])
+            end)
+            if ok and ton then pts[#pts + 1] = {tsx, tsy} end
+        end
+        if #pts >= 2 then
+            if ol_trail then draw.Polyline(pts, COLOR_BLACK, false, 3.5, trail_alpha) end
+            draw.Polyline(pts, trail_color, false, 1.5, trail_alpha)
+        end
+    end
+
+    -- [Snap Line]
+    if ui.getValue(TAB, VIS, "Snap Line") then
+        local ball_pos = get_ball_pos()
+        if ball_pos then
+            local sw, sh = cheat.GetWindowSize()
+            local ok, bsx, bsy = pcall(function()
+                local x, y = utility.WorldToScreen(ball_pos)
+                return x, y
+            end)
+            if ok and not (bsx and bsy) then
+                local cam_pos = game.CameraPosition
+                if cam_pos then
+                    local wx = ball_pos.X - cam_pos.X
+                    local wy = ball_pos.Y - cam_pos.Y
+                    local wz = ball_pos.Z - cam_pos.Z
+                    local wl = math.sqrt(wx*wx + wy*wy + wz*wz)
+                    if wl > 0.1 then
+                        bsx = sw * 0.5 + (wx/wl * cam_rx + wz/wl * cam_rz) * sw
+                        bsy = sh * 0.5 - (wy/wl) * sh
+                    end
+                end
+            end
+            if ok and bsx and bsy then
+                bsx = math.max(0, math.min(sw, bsx))
+                bsy = math.max(0, math.min(sh, bsy))
+                local snap_col_t = ui.getValue(TAB, VIS, "Snap Color") or {}
+                local snap_color = picker_to_color3(snap_col_t)
+                local snap_alpha = snap_col_t.a or 150
+                if ol_snap then draw.Polyline({{sw * 0.5, sh}, {bsx, bsy}}, COLOR_BLACK, false, 2.5, snap_alpha) end
+                draw.Polyline({{sw * 0.5, sh}, {bsx, bsy}}, snap_color, false, 1.0, snap_alpha)
+            end
+        end
+    end
+
+    -- [Velocity Arrow]
+    if ui.getValue(TAB, VIS, "Velocity Arrow") then
+        local ball_pos = get_ball_pos()
+        if ball_pos and world_ball and world_ball.Parent then
+            local ok_v, vel = pcall(function() return world_ball.Velocity end)
+            if ok_v and vel and vel.Magnitude > 0.5 then
+                local ok1, bsx, bsy, bon = pcall(function()
+                    return utility.WorldToScreen(ball_pos)
+                end)
+                local ok2, vdx, vdy = pcall(function()
+                    local x, y = utility.WorldToScreen(ball_pos + vel.Unit)
+                    return x, y
+                end)
+                if ok1 and ok2 and bon then
+                    local sdx, sdy = vdx - bsx, vdy - bsy
+                    local slen = math.sqrt(sdx * sdx + sdy * sdy)
+                    if slen > 0.5 then
+                        local nx, ny   = sdx / slen, sdy / slen
+                        local arr_len  = (ui.getValue(TAB, VIS, "Arrow Scale") or 1.0) * 50
+                        local ex, ey   = bsx + nx * arr_len, bsy + ny * arr_len
+                        local arr_col_t = ui.getValue(TAB, VIS, "Arrow Color") or {}
+                        local arr_color = picker_to_color3(arr_col_t)
+                        local arr_alpha = arr_col_t.a or 255
+
+                        local R = 6
+                        local B = R * 1.5
+                        local H = R * 0.866
+                        local apt = {
+                            {ex,               ey},
+                            {ex - nx*B - ny*H, ey - ny*B + nx*H},
+                            {ex - nx*B + ny*H, ey - ny*B - nx*H},
+                        }
+                        if ol_arrow then
+                            draw.Polyline({{bsx, bsy}, {ex, ey}}, COLOR_BLACK, false, 3.5, arr_alpha)
+                            draw.Polyline(apt, COLOR_BLACK, true, 3.5, arr_alpha)
+                        end
+                        draw.Polyline({{bsx, bsy}, {ex, ey}}, arr_color, false, 1.5, arr_alpha)
+                        draw.ConvexPolyFilled(apt, arr_color, arr_alpha)
+                        draw.Polyline(apt, arr_color, true, 1.5, arr_alpha)
+                    end
+                end
+            end
+        end
+    end
+
+    -- [Off-screen Ball Indicator]
+    if ui.getValue(TAB, VIS, "Ball Indicator") then
+        local ball_pos = get_ball_pos()
+        if ball_pos then
+            local sw, sh   = cheat.GetWindowSize()
+            local cx, cy   = sw * 0.5, sh * 0.5
+            local cam_pos  = game.CameraPosition
+
+            -- 3D world direction from camera to ball (used for dot-product + fallback)
+            local wx, wy, wz, wl = 0, 0, 0, 0
+            local ball_in_front  = false
+            if cam_pos then
+                wx = ball_pos.X - cam_pos.X
+                wy = ball_pos.Y - cam_pos.Y
+                wz = ball_pos.Z - cam_pos.Z
+                wl = math.sqrt(wx*wx + wy*wy + wz*wz)
+                if wl > 0.1 then
+                    -- Positive dot = ball is in front of camera
+                    ball_in_front = (wx * cam_fwx + wz * cam_fwz) > 0
+                end
+            end
+
+            local ok, bsx, bsy = pcall(function()
+                local x, y = utility.WorldToScreen(ball_pos)
+                return x, y
+            end)
+
+            local pad = 5
+            local on_screen = ok and bsx and bsy
+                              and bsx >= pad and bsx <= sw - pad
+                              and bsy >= pad and bsy <= sh - pad
+
+            if not on_screen then
+                -- Compute screen-space direction to ball
+                local dx, dy
+                if ok and bsx and bsy and ball_in_front then
+                    -- In front but off-screen: WorldToScreen coords are valid
+                    dx, dy = bsx - cx, bsy - cy
+                elseif wl > 0.1 then
+                    -- Behind camera or nil coords: project world dir onto camera axes
+                    dx = (wx/wl * cam_rx + wz/wl * cam_rz) * sw
+                    dy = -(wy/wl) * sh
+                end
+
+                if dx and dy then
+                    local len = math.sqrt(dx*dx + dy*dy)
+                    if len > 1 then
+                        local nx, ny    = dx / len, dy / len
+                        local mpos      = utility.GetMousePos()
+                        local mx, my    = mpos[1], mpos[2]
+                        local radius    = ui.getValue(TAB, VIS, "Indicator Radius") or 60
+                        local ex, ey    = mx + nx * radius, my + ny * radius
+                        local ind_col_t = ui.getValue(TAB, VIS, "Indicator Color") or {}
+                        local ind_color = picker_to_color3(ind_col_t)
+                        local ind_alpha = ind_col_t.a or 255
+                        local R = 8
+                        local B = R * 1.5
+                        local H = R * 0.866
+                        local ipt = {
+                            {ex,               ey},
+                            {ex - B*nx - H*ny, ey - B*ny + H*nx},
+                            {ex - B*nx + H*ny, ey - B*ny - H*nx},
+                        }
+                        if ol_ind then draw.Polyline(ipt, COLOR_BLACK, true, 3.5, ind_alpha) end
+                        draw.ConvexPolyFilled(ipt, ind_color, ind_alpha)
+                        draw.Polyline(ipt, ind_color, true, 1.5, ind_alpha)
                     end
                 end
             end
