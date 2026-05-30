@@ -219,6 +219,7 @@ local shape_breathe_t = 0.0
 
 local trail_positions = {}
 local _trail_last_t   = 0
+local _last_ball_center = nil  -- last accepted live_ball_center for snap-rejection
 
 local hk_prev = {}
 
@@ -1612,6 +1613,19 @@ cheat.register("onPaint", function()
                 local ok, p = pcall(function() return bp.Position end)
                 if ok and p then live_ball_center = p end
             end
+        end
+        -- Reject frames where the center jumps an implausible distance (ball reset snap)
+        -- 50 studs/frame at 60fps = 3000 st/s, far beyond any real ball speed
+        if live_ball_center then
+            if _last_ball_center and (live_ball_center - _last_ball_center).Magnitude > 50 then
+                live_ball_center = nil
+                live_ball_part   = nil
+                _last_ball_center = nil  -- clear so the next frame's reading is accepted fresh
+            else
+                _last_ball_center = live_ball_center
+            end
+        else
+            _last_ball_center = nil
         end
     end
 
