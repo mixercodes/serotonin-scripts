@@ -1086,9 +1086,11 @@ cheat.register("onUpdate", function()
             or (holder_char and local_char and holder_char.Name == local_char.Name)
 
         local glue_block = nil
-        if gk_has_ball then
+        if is_local_holding then
+            glue_block = "You have the ball"
+        elseif gk_has_ball then
             glue_block = "Ball held by AI"
-        elseif holder_char and holder_char.Parent and not is_local_holding then
+        elseif holder_char and holder_char.Parent then
             local ok_b, name = pcall(function() return holder_char.Name end)
             glue_block = "Ball held by " .. (ok_b and name or "another player")
         end
