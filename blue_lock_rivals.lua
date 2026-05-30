@@ -297,7 +297,6 @@ local function picker_to_color3(t)
 end
 
 local function get_ball_pos()
-    if local_has_ball or ball_is_stale then return nil end
     if held_ball and held_ball.Parent then
         local ok, p = pcall(function() return held_ball.Position end)
         if ok and p then return p end
@@ -662,14 +661,9 @@ cheat.register("onUpdate", function()
         end
     end
 
-    -- stale detection: GK possession is immediate; otherwise position-based (1s threshold)
-    if local_has_ball then
-        ball_is_stale = false
-        _ball_track_pos = nil
-    elseif gk_has_ball then
-        ball_is_stale = true
-        _ball_track_pos = nil
-    else
+    -- stale detection: position-based (1s threshold) for ball genuinely stuck/glitched
+    ball_is_stale = false
+    do
         local raw_pos
         if held_ball and held_ball.Parent then
             pcall(function() raw_pos = held_ball.Position end)
@@ -1751,12 +1745,8 @@ cheat.register("onPaint", function()
         local ball_fill_color = picker_to_color3(ball_fill_t)
         local ball_fill_alpha = ball_fill_t.a or 60
 
-        local is_local_holding = local_has_ball
-            or (holder_char and local_char and holder_char.Name == local_char.Name)
         local ball_part
-        if is_local_holding or ball_is_stale then
-            -- local player holds ball, or ball is frozen (AI holder etc.) — skip ESP
-        elseif held_ball and held_ball.Parent then
+        if held_ball and held_ball.Parent then
             ball_part = held_ball
         elseif holder_char and holder_char.Parent then
             ball_part = holder_char:FindFirstChild("Football")
