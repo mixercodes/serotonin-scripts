@@ -1155,7 +1155,8 @@ cheat.register("onUpdate", function()
             return
         end
 
-        local enemy_hrp = nil
+        local enemy_hrp       = nil
+        local teammate_has_ball = false
         if holder_char and holder_char.Parent and not is_local_holding and not gk_has_ball then
             local ok_team, is_enemy = pcall(function()
                 local lp = game.LocalPlayer
@@ -1167,7 +1168,22 @@ cheat.register("onUpdate", function()
             end)
             if ok_team and is_enemy then
                 enemy_hrp = holder_char:FindFirstChild("HumanoidRootPart")
+            elseif ok_team then
+                teammate_has_ball = true
             end
+        end
+
+        if teammate_has_ball then
+            if ptb_phase ~= "idle" then
+                if ptb_phase == "stealing" then keyboard.Release("e") end
+                ptb_retries     = 0
+                tween_start_pos = nil
+                ret_tween_start = nil
+                ptb_phase       = "idle"
+                ptb_return_pos  = nil
+            end
+            set_tp_status("Teammate has ball", nil)
+            return
         end
 
         local function ball_approach_target()
