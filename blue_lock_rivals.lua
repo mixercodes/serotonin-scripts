@@ -66,7 +66,7 @@ ui.newDropdown(TAB, FEAT, "Goal Target", {"Auto (enemy)", "Home", "Away"})
 -- [Visuals & Config]
 ui.NewContainer(TAB, VIS, "Visuals", { autosize = true, next = true })
 ui.newDropdown(TAB, VIS, "Font", VIS_FONTS)
-ui.NewCheckbox(TAB, VIS, "Info Display")
+ui.NewCheckbox(TAB, VIS, "Debug Info")
 ui.NewCheckbox(TAB, VIS, "Show Speed")
 ui.NewCheckbox(TAB, VIS, "Show Distance")
 ui.NewCheckbox(TAB, VIS, "Show GK Status")
@@ -145,7 +145,7 @@ ui.setValue(TAB, FEAT, "Auto Goal",         false)
 ui.setValue(TAB, FEAT, "Goal Target",       0)
 
 ui.setValue(TAB, VIS, "Font",          1)
-ui.setValue(TAB, VIS, "Info Display",  true)
+ui.setValue(TAB, VIS, "Debug Info",  false)
 ui.setValue(TAB, VIS, "Show Speed",    true)
 ui.setValue(TAB, VIS, "Show Distance", true)
 ui.setValue(TAB, VIS, "Show GK Status", true)
@@ -530,7 +530,7 @@ local SAVE_WIDGETS = {
     {FEAT, "Auto Goal Key",    "hk"},
     {FEAT, "Goal Target",      "val"},
     {VIS,  "Font",             "val"},
-    {VIS,  "Info Display",     "val"},
+    {VIS,  "Debug Info",     "val"},
     {VIS,  "Ball ESP",         "val"},
     {VIS,  "Box",              "val"},
     {VIS,  "Ball Fill",        "val"},
@@ -784,7 +784,7 @@ cheat.register("onUpdate", function()
     ui.SetVisibility(TAB, VIS, "Trail Color",     trail_on)
     ui.SetVisibility(TAB, VIS, "Trail Length",    trail_on)
 
-    local info_on = ui.getValue(TAB, VIS, "Info Display")
+    local info_on = ui.getValue(TAB, VIS, "Debug Info")
     ui.SetVisibility(TAB, VIS, "Show Speed",    info_on)
     ui.SetVisibility(TAB, VIS, "Show Distance", info_on)
     ui.SetVisibility(TAB, VIS, "Show GK Status", info_on)
@@ -1674,7 +1674,7 @@ cheat.register("onPaint", function()
         info_speed = 0
     end
 
-    if ui.getValue(TAB, VIS, "Info Display") then
+    if ui.getValue(TAB, VIS, "Debug Info") then
         local _sw, sh = cheat.GetWindowSize()
         local x       = 10
         local lines = {}
@@ -1687,7 +1687,7 @@ cheat.register("onPaint", function()
             return ""
         end
 
-        add("BL:R", COLOR_BLUE)
+        add("[ DEBUG ]", COLOR_YELLOW)
         if ui.getValue(TAB, VIS, "Show Speed") then
             local display_status = local_has_ball and "You (held)" or ball_status
             add(tostring(info_speed) .. " st/s  " .. display_status)
