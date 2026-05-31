@@ -13,11 +13,11 @@ Loaded automatically by Claude Code on every session. Contains workflow rules, r
 Two MCP servers extend Claude's capabilities beyond file editing:
 
 - `serotonin-docs` - serves the community-audited Serotonin API reference (17 libraries, 130 functions, crash flags). Claude queries this before writing any API call instead of guessing.
-- `serotonin-bridge` - connects to the live running Roblox game via `bridge.lua`. Lets Claude inspect the real instance tree, run Lua, read player positions, and verify game state while writing scripts.
+- `serotonin` - file-based IPC bridge to the live running Roblox game via `agent.lua`. Lets Claude dump the instance tree, run lightweight Lua, inspect instances, read/write UI values, and verify game state while writing scripts. No WebSocket — crash-safe by design.
 
-Both MCP servers are from [DeftSolutions-dev/mcp-serotonin](https://github.com/DeftSolutions-dev/mcp-serotonin) - setup instructions are on that repo.
+The `serotonin` server is at [mixercodes/mcp-serotonin-v2](https://github.com/mixercodes/mcp-serotonin-v2). The `serotonin-docs` server is published as `mcp-serotonin-docs` on npm.
 
-MCP config lives in `.mcp.json` at the repo root (or your Claude Code settings). To use the bridge, load `bridge.lua` in Serotonin before starting a Claude session.
+MCP config lives in `.mcp.json` at the repo root. To use the bridge, load `agent.lua` in Serotonin before starting a Claude session.
 
 **3. Type stubs (`.globals/environment.d.luau`)**
 Luau type definitions for luau-lsp autocomplete. Claude uses these as a secondary reference - runtime behavior always wins over the stubs when they conflict.
@@ -29,7 +29,7 @@ Luau type definitions for luau-lsp autocomplete. Claude uses these as a secondar
 claude
 ```
 
-Claude will pick up CLAUDE.md automatically. For bridge-assisted script writing, make sure Serotonin is running with `bridge.lua` loaded first - Claude will ping it to confirm the connection before making live game queries.
+Claude will pick up CLAUDE.md automatically. For live game queries, make sure Serotonin is running with `agent.lua` loaded first. Claude will ping it to confirm the connection before making live game queries.
 
 ## No Guessing API Syntax
 
@@ -85,37 +85,34 @@ All globals are available without `require`:
 
 **Custom models**: `entity.AddModel(key, data)` / `entity.EditModel()` / `entity.RemoveModel()` add NPCs/objects to the entity cache.
 
-## Live Game State (MCP bridge)
+## Live Game State (MCP agent)
 
-An MCP server at `C:/Serotonin/mcp-serotonin/` exposes **live** data from the running game when `bridge.lua` is loaded in Serotonin. Use it to ground script writing in the actual game state instead of guessing instance names or hoping `entity.GetPlayers` works in this mode.
-
-Tools (all prefixed `serotonin_`):
+The `serotonin` MCP server at `C:/Serotonin/mcp-serotonin-v2/` exposes **live** data from the running game when `agent.lua` is loaded in Serotonin. Uses file-based IPC — no WebSocket, no crash risk. Use it to ground script writing in the actual game state instead of guessing instance names.
 
 | Tool | Use when |
 |---|---|
-| `ping` | Verify bridge is live |
-| `eval` | Run arbitrary Lua; returns serialized result (Instances → handles, Vector3/Color3 keep types) |
-| `inspect` / `safe_inspect` | Properties / Attributes / Children of an Instance |
-| `tree` / `search_instances` / `find_by_class` | Walk the data model |
-| `list_players` / `players_full` | Enemy list with live HRP + screen projection (prefer `players_full`) |
-| `get_bones` | Bone positions for a player |
-| `list_parts` / `nearest` | Parts around the player |
-| `project_to_screen` / `screen_info` | WorldToScreen, window size, mouse, camera |
-| `memory_read` / `memory_write` / `memory_base` | Direct memory access |
-| `get_scripts` | Dot-paths to all Script/LocalScript/ModuleScript (source not exposed) |
+| `ping` | Verify agent is live |
+| `eval` | Run a lightweight Lua expression; returns JSON-serialized result |
+| `dump_workspace` | Full Workspace tree dump, chunked across frames (safe for large games) |
+| `list_dumps` | List saved dump files, newest first |
+| `read_dump` | Page through a dump file by line offset |
+| `grep_dump` | Regex-search a dump for instance names, classes, or value flags |
+| `inspect` | Properties + children of a specific instance by Lua path |
+| `players` | Player list with live positions from `entity.GetPlayers` |
+| `get_ui` / `set_ui` | Read or write a Serotonin UI widget value |
 
-**When to use it**: before writing anything mode-specific (ESP, aimbot, entity queries), call `players_full` / `tree` to confirm the instance layout. When a user reports "the script doesn't see X", inspect the live tree first.
+**When to use it**: before writing anything mode-specific (ESP, aimbot, entity queries), run `dump_workspace` then `grep_dump` to confirm the instance layout. When a user reports "the script doesn't see X", use `inspect` or `grep_dump` to find it in the live tree.
 
-**When *not* to use it**: API reference questions. The bridge doesn't know Serotonin's Lua API shape — use the `serotonin-docs` MCP for that.
+**When *not* to use it**: API reference questions. The agent doesn't know Serotonin's Lua API shape — use the `serotonin-docs` MCP for that.
 
-**Known crashers**: the bridge auto-blocks these in `eval` — see `C:/Serotonin/mcp-serotonin/crash_blacklist.json` for the authoritative list. Parallel `eval` calls also crash — the server serializes them, stay on the tools.
+**`eval` is for lightweight queries only.** Do not use it for heavy recursive work — use `dump_workspace` for tree traversal. Simple expressions like `return game.PlaceId` or `return entity.GetPlayers(true)` are fine.
 
-**Gotchas verified via bridge use**:
+**Gotchas verified via agent eval**:
 - `game.GetService` uses dot syntax: `game.GetService("Players")`, not `game:GetService(...)`. The Lua `game` is a sandbox proxy table, not an Instance userdata.
 - `entity.GetPlayers()` returns userdata (not indices as older docs claim). Access fields as `p.Name`, call bone methods as `p:GetBonePosition("HumanoidRootPart")`.
 - `entity.Position` is often stale (stays at `(0,0,0)` in FFA modes). Use `p:GetBonePosition("HumanoidRootPart")` for the live value.
 - Valid `memory.Read` / `memory.Write` types: see `MemoryType` in `.globals/environment.d.luau`.
-- **Bridge observations are only valid for the current game state.** Never draw conclusions from bridge data collected outside the game state being debugged — instance structure and value semantics can differ significantly between states.
+- **Agent observations are only valid for the current game state.** Never draw conclusions from data collected outside the game state being debugged — instance structure and value semantics can differ significantly between states.
 - **Always verify the Lua `type()` of a value before writing comparisons against it.** A `BoolValue.Value` may be exposed as a number in Serotonin's sandbox — `op.Value == true` silently fails if the value is numeric.
 
 ## Documentation
@@ -134,6 +131,8 @@ Use the `serotonin-docs` MCP tools for API questions:
 For LLM context bundling: the full reference is also available as a single blob at https://deftsolutions-dev.github.io/serotonin-api-docs/llms-full.md.
 
 **Resolution order for API questions:** `serotonin-docs` MCP → `.globals/environment.d.luau` (type stubs, least reliable for runtime). Where these disagree with observed runtime behavior, runtime wins.
+
+**Docs before agent — always.** When wondering whether a Serotonin API feature exists (a utility function, a file method, a draw call, anything), search `serotonin-docs` first. Do not reach for the `eval` tool to probe what's available — the agent doesn't know Serotonin's Lua API shape and probing it is slow and unreliable for capability discovery. Only use the agent to verify *runtime behavior* of something the docs already describe, or to inspect live game state. Example failure mode: spending multiple eval round-trips discovering `os.date`/`DateTime` are unavailable, when `utility.GetSystemTime()` and `utility.GetTimestamp()` were in the docs the whole time.
 
 ## Type Definitions
 

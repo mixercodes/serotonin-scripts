@@ -1,11 +1,8 @@
 {
   "mcpServers": {
-    "serotonin-bridge": {
-      "command": "python",
-      "args": ["C:/Serotonin/mcp-serotonin/server.py"],
-      "env": {
-        "PYTHONUNBUFFERED": "1"
-      }
+    "serotonin": {
+      "command": "node",
+      "args": ["C:\\Serotonin\\mcp-serotonin-v2\\dist\\index.js"]
     },
     "serotonin-docs": {
       "command": "npx",

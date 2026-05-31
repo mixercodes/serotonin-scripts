@@ -1,6 +1,6 @@
 # serotonin-scripts
 
-Personal scripts for the [Serotonin](https://serotonin-1.gitbook.io) Lua scripting API.
+Personal scripts for the [Serotonin](https://serotonin.gg/) Lua scripting API, with a full Claude Code AI setup for script writing and live game inspection.
 
 ## Development setup
 
@@ -8,14 +8,13 @@ Personal scripts for the [Serotonin](https://serotonin-1.gitbook.io) Lua scripti
 
 - [VS Code](https://code.visualstudio.com/)
 - [luau-lsp](https://marketplace.visualstudio.com/items?itemName=JohnnyMorganz.luau-lsp) extension
-- [Python 3.10+](https://www.python.org/downloads/) — for the MCP bridge server
-- [Node.js LTS](https://nodejs.org/) — for the MCP docs server
+- [Node.js LTS](https://nodejs.org/)
 - Git
 
 ### 1. Clone the repo
 
 ```bash
-git clone git@github.com:mixercodes/serotonin-scripts.git
+git clone https://github.com/mixercodes/serotonin-scripts.git
 cd serotonin-scripts
 ```
 
@@ -33,30 +32,26 @@ Two MCP servers let Claude Code talk to the live game and API docs:
 
 | Server | What it does |
 |---|---|
-| `serotonin-bridge` | Connects Claude to the running game via `bridge.lua` — live instance inspection, Lua eval, player positions |
-| `serotonin-docs` | Serves the community-audited Serotonin API reference so Claude looks up signatures instead of guessing |
+| `serotonin` | File-based IPC bridge to the running game — workspace dumps, Lua eval, instance inspection, UI read/write |
+| `serotonin-docs` | Community-audited API reference so Claude looks up signatures instead of guessing |
 
-**Clone the bridge server**
-
-```bash
-git clone https://github.com/DeftSolutions-dev/mcp-serotonin C:/Serotonin/mcp-serotonin
-```
-
-**Install Python dependencies**
+**Clone and build the serotonin MCP server:**
 
 ```bash
-pip install -r C:/Serotonin/mcp-serotonin/requirements.txt
+git clone https://github.com/mixercodes/mcp-serotonin-v2 C:/Serotonin/mcp-serotonin-v2
+cd C:/Serotonin/mcp-serotonin-v2
+npm install
+npm run build
 ```
 
-**Create `.mcp.json` in the repo root** (already present if you cloned this repo — verify the path is correct):
+**The `.mcp.json` in this repo is pre-configured** — verify the path matches your install location:
 
 ```json
 {
   "mcpServers": {
-    "serotonin-bridge": {
-      "command": "python",
-      "args": ["C:/Serotonin/mcp-serotonin/server.py"],
-      "env": { "PYTHONUNBUFFERED": "1" }
+    "serotonin": {
+      "command": "node",
+      "args": ["C:/Serotonin/mcp-serotonin-v2/dist/index.js"]
     },
     "serotonin-docs": {
       "command": "npx",
@@ -66,15 +61,9 @@ pip install -r C:/Serotonin/mcp-serotonin/requirements.txt
 }
 ```
 
-**Load `bridge.lua` in Serotonin**
+**Load `agent.lua` in Serotonin:**
 
-`bridge.lua` is included in this repo at `bridge.lua`. In Serotonin's Scripting tab, load it. You should see:
-
-```
-[serotonin-bridge v2] loaded, polling http://127.0.0.1:8765
-```
-
-The bridge must be running whenever you want Claude to query live game state.
+`agent.lua` is included in this repo. In Serotonin's Scripting tab, load it. The HUD bottom-right will show `Agent: idle` when ready.
 
 ### 4. Run Claude Code
 
@@ -82,9 +71,7 @@ The bridge must be running whenever you want Claude to query live game state.
 claude
 ```
 
-`CLAUDE.md` is picked up automatically. Claude will use `serotonin-bridge` to inspect the live game and `serotonin-docs` to look up API signatures before writing any Serotonin call.
-
-To verify the bridge is connected, ask Claude to ping it — you should get `"pong"`.
+`CLAUDE.md` is picked up automatically. To verify everything is connected, ask Claude to ping — you should get `pong — agent is live`.
 
 ---
 
@@ -93,12 +80,10 @@ To verify the bridge is connected, ask Claude to ping it — you should get `"po
 In Serotonin's Scripting tab, use **Load** to run a `.lua` file directly from disk, or fetch from the raw GitHub URL:
 
 ```lua
-http.Get("https://raw.githubusercontent.com/mixercodes/serotonin-scripts/master/<script>.lua", {}, function(body)
+http.Get("https://raw.githubusercontent.com/mixercodes/serotonin-scripts/master/blue_lock_rivals.lua", {}, function(body)
     loadstring(body)()
 end)
 ```
-
-Replace `<script>` with the filename (without `.lua` extension not needed in the URL, include it).
 
 ---
 
@@ -107,12 +92,14 @@ Replace `<script>` with the filename (without `.lua` extension not needed in the
 - **Community docs (preferred)**: https://deftsolutions-dev.github.io/serotonin-api-docs/ — hand-audited against a live runtime, correct signatures and crash flags for all 17 libraries.
 - **Official gitbook**: https://serotonin-1.gitbook.io — use as fallback only, known to have drifted from the actual runtime.
 
+---
+
 ## Folder structure
 
 ```
 .globals/          Luau type stubs for luau-lsp autocomplete
 .vscode/           VS Code workspace settings
-bridge.lua         Load this in Serotonin to enable the MCP bridge
+agent.lua          Load this in Serotonin to enable the MCP bridge
 .mcp.json          MCP server config for Claude Code
 CLAUDE.md          Claude Code instructions (AI workflow, conventions, gotchas)
 *.lua              Scripts
