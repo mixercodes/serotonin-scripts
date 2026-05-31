@@ -1,6 +1,6 @@
 # serotonin-scripts
 
-Personal scripts for the [Serotonin](https://serotonin.gg/) Lua scripting API, with a full Claude Code AI setup for script writing and live game inspection.
+Personal scripts for the [Serotonin](https://serotonin.win/) Lua scripting API, with a full Claude Code AI setup for script writing and live game inspection.
 
 ## Development setup
 
