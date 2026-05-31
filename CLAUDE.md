@@ -192,11 +192,14 @@ These behaviors have been confirmed in production scripts:
 
 ## Dynamic Game Data
 
-Game data (team names, instance names, folder structure, object positions) can change between matches and server instances. Never hardcode or assume in-game state — always query dynamically at runtime:
+Scripts run across varied contexts: different server instances of the same game (different players, match state, positions), or entirely different Roblox games if the script is universal. **Never hardcode or assume in-game state** — always query dynamically at runtime.
+
+**Universal scripts** must degrade gracefully when expected instances are absent. Guard every lookup with `FindFirstChild` and `pcall`. **Game-specific scripts** still query state at runtime — even within one game, instance names, folder structure, and values differ between servers and match states.
+
 - Player team: `pcall(function() player_team = tostring(lp.Team) end)` — returns the live team name as a string ("Home", "Away", etc.)
 - Target goal: iterate `Goals:GetChildren()` and find the `Part`/`MeshPart` whose `.Name == player_team` — goals are named after the team that scores into them, so match the player's team name directly. Do not hardcode "Home"/"Away" string comparisons.
 - Instance children: use `:FindFirstChild()` or `:GetChildren()` on live instances each time, not cached name assumptions
-- Use the bridge (`players_full`, `tree`, `eval`) to verify actual instance names before writing any game-specific lookup
+- Use `dump_workspace` + `grep_dump`, or `inspect`, to verify actual instance names before writing any game-specific lookup
 
 ## Before Writing Any Script
 
