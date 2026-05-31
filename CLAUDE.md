@@ -94,6 +94,7 @@ The `serotonin` MCP server at `C:/Serotonin/mcp-serotonin-v2/` exposes **live** 
 | `ping` | Verify agent is live |
 | `eval` | Run a lightweight Lua expression; returns JSON-serialized result |
 | `dump_workspace` | Full Workspace tree dump, chunked across frames (safe for large games) |
+| `dump_subtree` | Dump a specific subtree (e.g. ReplicatedStorage, a single model) — faster and smaller than a full workspace dump |
 | `list_dumps` | List saved dump files, newest first |
 | `read_dump` | Page through a dump file by line offset |
 | `grep_dump` | Regex-search a dump for instance names, classes, or value flags |
@@ -106,6 +107,22 @@ The `serotonin` MCP server at `C:/Serotonin/mcp-serotonin-v2/` exposes **live** 
 **When *not* to use it**: API reference questions. The agent doesn't know Serotonin's Lua API shape — use the `serotonin-docs` MCP for that.
 
 **`eval` is for lightweight queries only.** Do not use it for heavy recursive work — use `dump_workspace` for tree traversal. Simple expressions like `return game.PlaceId` or `return entity.GetPlayers(true)` are fine.
+
+### Investigation decision table
+
+Use this to pick the right tool the first time. `grep_dump` is always the search step — never use Python or external tools to search dump output.
+
+| Looking for… | Do this |
+|---|---|
+| **Player action/state flags** (is X stealing, blocking, guarding, etc.) | `eval` → `char:GetAttributes()` on one player's character. Attributes are the standard carrier for per-player boolean state in Roblox games. |
+| **Instance names / tree structure** in Workspace | `dump_workspace` → `grep_dump` with a keyword regex |
+| **Something inside a specific large service** (ReplicatedStorage, ServerStorage, etc.) | `dump_subtree` on that service → `grep_dump`. **Never use `eval` with recursive Lua to scan a service** — it produces output too large to process. |
+| **Properties of one known instance** | `inspect` with the full Lua path (e.g. `game.Workspace.Game.Ball`) |
+| **Whether a player has the ball** | `eval` → check `char:FindFirstChild("Basketball")` (a `Tool` named `Basketball` appears in the character when they hold it) |
+
+**Attributes are invisible to dumps.** `grep_dump` only sees instance names and classes — it cannot find data stored as instance attributes. If you grep a dump and find nothing, check `GetAttributes()` on the relevant instance via `eval` before concluding the data isn't there.
+
+**`GetAttributes()` format in Serotonin's sandbox**: returns an array of tables, not a flat dict. Each entry is `{Name = "...", TypeName = "bool"/"int"/etc., Value = ...}`. Iterate with `pairs` and check `attr.Name` and `attr.Value`.
 
 **Gotchas verified via agent eval**:
 - `game.GetService` uses dot syntax: `game.GetService("Players")`, not `game:GetService(...)`. The Lua `game` is a sandbox proxy table, not an Instance userdata.
