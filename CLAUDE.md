@@ -17,7 +17,7 @@ Two MCP servers extend Claude's capabilities beyond file editing:
 
 The `serotonin` server is at [mixercodes/mcp-serotonin-v2](https://github.com/mixercodes/mcp-serotonin-v2). The `serotonin-docs` server is published as `mcp-serotonin-docs` on npm.
 
-MCP config lives in `.mcp.json` at the repo root. To use the bridge, load `agent.lua` in Serotonin before starting a Claude session.
+MCP config lives in `.mcp.json` at the repo root. To use the agent, load `C:/Serotonin/mcp-serotonin-v2/lua/agent.lua` directly from the MCP repo in Serotonin before starting a Claude session.
 
 **3. Type stubs (`.globals/environment.d.luau`)**
 Luau type definitions for luau-lsp autocomplete. Claude uses these as a secondary reference - runtime behavior always wins over the stubs when they conflict.

@@ -63,7 +63,7 @@ npm run build
 
 **Load `agent.lua` in Serotonin:**
 
-`agent.lua` is included in this repo. In Serotonin's Scripting tab, load it. The HUD bottom-right will show `Agent: idle` when ready.
+In Serotonin's Scripting tab, load `C:/Serotonin/mcp-serotonin-v2/lua/agent.lua` directly from the MCP repo. The HUD bottom-right will show `Agent: idle` when ready. Loading it from the MCP repo means you always get the latest version when you pull updates there.
 
 ### 4. Run Claude Code
 
@@ -99,7 +99,7 @@ end)
 ```
 .globals/          Luau type stubs for luau-lsp autocomplete
 .vscode/           VS Code workspace settings
-agent.lua          Load this in Serotonin to enable the MCP bridge
+agent.lua          Lives in mcp-serotonin-v2/lua/ — load from there directly
 .mcp.json          MCP server config for Claude Code
 CLAUDE.md          Claude Code instructions (AI workflow, conventions, gotchas)
 *.lua              Scripts
