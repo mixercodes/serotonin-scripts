@@ -1,21 +1,35 @@
--- blue_lock_rivals.lua (merged with ball_manipulation)
+-- blue_lock_rivals.lua (two-tab layout)
 
 local TP_MODES     = {"Ball to Player", "Player to Ball"}
 local TRAVEL_MODES = {"Instant", "Tween"}
 local VIS_FONTS    = {"SmallestPixel", "Verdana", "ConsolasBold", "Tahoma"}
 
+-- Tab 1: controls
 local TAB  = "blr_tab"
 local MAN  = "blr_man"
+local DRIB = "blr_drib"
 local FEAT = "blr_feat"
+
+-- Tab 2: visuals
+local TAB2 = "blr_tab2"
+local BESP = "blr_besp"
+local GESP = "blr_gesp"
 local VIS  = "blr_vis"
 
-local OFF_UP     = 2.5
-local pi         = math.pi
-local pi2        = pi * 2
-local sin, cos   = math.sin, math.cos
+local function ct(container)
+    if container == MAN or container == DRIB or container == FEAT then return TAB end
+    return TAB2
+end
+
+local OFF_UP      = 2.5
+local pi          = math.pi
+local pi2         = pi * 2
+local sin, cos    = math.sin, math.cos
 local CONFIG_FILE = "blr_config.lua"
 
 local config_save, config_load  -- forward declarations for button callbacks
+
+-- ── Tab 1 ──────────────────────────────────────────────────────────────────
 
 ui.newTab(TAB, "BL:R")
 
@@ -30,13 +44,16 @@ ui.NewCheckbox(TAB, MAN, "BC Enabled")
 ui.newHotkey(TAB, MAN, "BC Key", true)
 ui.newSliderFloat(TAB, MAN, "Move Speed",   1.0, 100.0)
 ui.NewCheckbox(TAB, MAN, "Freeze Player")
-ui.NewCheckbox(TAB, MAN, "Auto Dribble")
-ui.newHotkey(TAB, MAN, "Dribble Key", true)
-ui.newSliderFloat(TAB, MAN, "Dribble Radius", 2.0, 15.0)
-ui.NewCheckbox(TAB, MAN, "Show Radius")
-ui.NewCheckbox(TAB, MAN, "Linger")
-ui.newSliderFloat(TAB, MAN, "Linger Radius",   2.0, 15.0)
-ui.NewSliderInt(TAB, MAN,   "Linger Time (ms)", 50, 500)
+
+-- [Auto Dribble]
+ui.NewContainer(TAB, DRIB, "Auto Dribble", { autosize = true, next = true })
+ui.NewCheckbox(TAB, DRIB, "Auto Dribble")
+ui.newHotkey(TAB, DRIB, "Dribble Key", true)
+ui.newSliderFloat(TAB, DRIB, "Dribble Radius", 2.0, 15.0)
+ui.NewCheckbox(TAB, DRIB, "Show Radius")
+ui.NewCheckbox(TAB, DRIB, "Linger")
+ui.newSliderFloat(TAB, DRIB, "Linger Radius",   2.0, 15.0)
+ui.NewSliderInt(TAB, DRIB,   "Linger Time (ms)", 50, 500)
 
 -- [Ball Features]
 ui.NewContainer(TAB, FEAT, "Ball Features", { autosize = true, next = true })
@@ -63,67 +80,79 @@ ui.NewCheckbox(TAB, FEAT, "Auto Goal")
 ui.newHotkey(TAB, FEAT, "Auto Goal Key", true)
 ui.newDropdown(TAB, FEAT, "Goal Target", {"Auto (enemy)", "Home", "Away"})
 
--- [Visuals & Config]
-ui.NewContainer(TAB, VIS, "Visuals", { autosize = true, next = true })
-ui.newDropdown(TAB, VIS, "Font", VIS_FONTS)
-ui.NewCheckbox(TAB, VIS, "Debug Info")
-ui.NewCheckbox(TAB, VIS, "Show Speed")
-ui.NewCheckbox(TAB, VIS, "Show Distance")
-ui.NewCheckbox(TAB, VIS, "Show GK Status")
-ui.NewCheckbox(TAB, VIS, "Ball ESP")
-ui.NewCheckbox(TAB, VIS, "Box")
-ui.NewColorpicker(TAB, VIS, "Ball Color",      {r=255, g=255, b=255, a=255}, true)
-ui.NewCheckbox(TAB, VIS, "Ball Fill")
-ui.NewColorpicker(TAB, VIS, "Ball Fill Color", {r=255, g=255, b=255, a=60},  true)
-ui.NewCheckbox(TAB, VIS, "Ball ESP Text")
-ui.NewCheckbox(TAB, VIS, "Shape")
-ui.NewColorpicker(TAB, VIS, "Shape Color", {r=0, g=120, b=255, a=255}, true)
-ui.NewCheckbox(TAB, VIS, "Shape Fill")
-ui.NewColorpicker(TAB, VIS, "Shape Fill Color", {r=0, g=120, b=255, a=50}, true)
-ui.newDropdown(TAB, VIS, "Shape Type", {"Star of David", "Hexagon", "Pentagon", "Circle"})
-ui.newSliderFloat(TAB, VIS, "Shape Size",      10.0, 100.0)
-ui.NewCheckbox(TAB, VIS, "Shape Spin")
-ui.newSliderFloat(TAB, VIS, "Spin Speed",       0.1, 10.0)
-ui.NewCheckbox(TAB, VIS, "Shape Breathe")
-ui.newSliderFloat(TAB, VIS, "Breathe Amount",  0.05, 0.5)
-ui.newSliderFloat(TAB, VIS, "Shape Thickness", 0.5,  6.0)
-ui.NewCheckbox(TAB, VIS, "Goal ESP")
-ui.NewColorpicker(TAB, VIS, "Home Color",      {r=0, g=180, b=255, a=255},   true)
-ui.NewColorpicker(TAB, VIS, "Away Color",      {r=255, g=80, b=80, a=255},   true)
-ui.NewCheckbox(TAB, VIS, "Goal ESP Text")
-ui.NewCheckbox(TAB, VIS, "Goal Fill")
-ui.NewColorpicker(TAB, VIS, "Home Fill Color", {r=0, g=180, b=255, a=40},    true)
-ui.NewColorpicker(TAB, VIS, "Away Fill Color", {r=255, g=80, b=80, a=40},    true)
-ui.NewCheckbox(TAB, VIS, "Ball Indicator")
-ui.NewColorpicker(TAB, VIS, "Indicator Color", {r=29, g=123, b=188, a=164}, true)
-ui.newSliderFloat(TAB, VIS, "Indicator Radius", 20.0, 200.0)
-ui.NewCheckbox(TAB, VIS, "Velocity Arrow")
-ui.NewColorpicker(TAB, VIS, "Arrow Color", {r=255, g=255, b=255, a=255}, true)
-ui.newSliderFloat(TAB, VIS, "Arrow Scale", 0.5, 5.0)
-ui.NewCheckbox(TAB, VIS, "Snap Line")
-ui.NewColorpicker(TAB, VIS, "Snap Color", {r=255, g=255, b=255, a=150}, true)
-ui.NewCheckbox(TAB, VIS, "Ball Trail")
-ui.NewColorpicker(TAB, VIS, "Trail Color", {r=255, g=255, b=255, a=200}, true)
-ui.NewSliderInt(TAB, VIS, "Trail Length", 5, 60)
-ui.NewMultiselect(TAB, VIS, "ESP Outlines", {"Box", "Shape", "Goal", "Indicator", "Arrow", "Snap", "Trail"})
-ui.NewButton(TAB, VIS, "Save Config",   function() config_save() end)
-ui.NewButton(TAB, VIS, "Load Config",   function() config_load() end)
-ui.NewButton(TAB, VIS, "Delete Config", function() file.delete(CONFIG_FILE) end)
+-- ── Tab 2 ──────────────────────────────────────────────────────────────────
 
--- [Defaults]
+ui.newTab(TAB2, "BL:R Visual")
+
+-- [Ball ESP]
+ui.NewContainer(TAB2, BESP, "Ball ESP", { autosize = true })
+ui.NewCheckbox(TAB2, BESP, "Ball ESP")
+ui.NewCheckbox(TAB2, BESP, "Box")
+ui.NewColorpicker(TAB2, BESP, "Ball Color",      {r=255, g=255, b=255, a=255}, true)
+ui.NewCheckbox(TAB2, BESP, "Ball Fill")
+ui.NewColorpicker(TAB2, BESP, "Ball Fill Color", {r=255, g=255, b=255, a=60},  true)
+ui.NewCheckbox(TAB2, BESP, "Ball ESP Text")
+ui.NewCheckbox(TAB2, BESP, "Shape")
+ui.NewColorpicker(TAB2, BESP, "Shape Color",     {r=0, g=120, b=255, a=255},   true)
+ui.NewCheckbox(TAB2, BESP, "Shape Fill")
+ui.NewColorpicker(TAB2, BESP, "Shape Fill Color",{r=0, g=120, b=255, a=50},    true)
+ui.newDropdown(TAB2, BESP, "Shape Type", {"Star of David", "Hexagon", "Pentagon", "Circle"})
+ui.newSliderFloat(TAB2, BESP, "Shape Size",      10.0, 100.0)
+ui.NewCheckbox(TAB2, BESP, "Shape Spin")
+ui.newSliderFloat(TAB2, BESP, "Spin Speed",       0.1, 10.0)
+ui.NewCheckbox(TAB2, BESP, "Shape Breathe")
+ui.newSliderFloat(TAB2, BESP, "Breathe Amount",  0.05, 0.5)
+ui.newSliderFloat(TAB2, BESP, "Shape Thickness", 0.5,  6.0)
+
+-- [Goal & Indicators]
+ui.NewContainer(TAB2, GESP, "Goal & Indicators", { autosize = true, next = true })
+ui.NewCheckbox(TAB2, GESP, "Goal ESP")
+ui.NewColorpicker(TAB2, GESP, "Home Color",      {r=0, g=180, b=255, a=255},  true)
+ui.NewColorpicker(TAB2, GESP, "Away Color",      {r=255, g=80, b=80, a=255},  true)
+ui.NewCheckbox(TAB2, GESP, "Goal ESP Text")
+ui.NewCheckbox(TAB2, GESP, "Goal Fill")
+ui.NewColorpicker(TAB2, GESP, "Home Fill Color", {r=0, g=180, b=255, a=40},   true)
+ui.NewColorpicker(TAB2, GESP, "Away Fill Color", {r=255, g=80, b=80, a=40},   true)
+ui.NewCheckbox(TAB2, GESP, "Ball Indicator")
+ui.NewColorpicker(TAB2, GESP, "Indicator Color", {r=29, g=123, b=188, a=164}, true)
+ui.newSliderFloat(TAB2, GESP, "Indicator Radius", 20.0, 200.0)
+ui.NewCheckbox(TAB2, GESP, "Velocity Arrow")
+ui.NewColorpicker(TAB2, GESP, "Arrow Color",     {r=255, g=255, b=255, a=255}, true)
+ui.newSliderFloat(TAB2, GESP, "Arrow Scale",     0.5, 5.0)
+ui.NewCheckbox(TAB2, GESP, "Snap Line")
+ui.NewColorpicker(TAB2, GESP, "Snap Color",      {r=255, g=255, b=255, a=150}, true)
+ui.NewCheckbox(TAB2, GESP, "Ball Trail")
+ui.NewColorpicker(TAB2, GESP, "Trail Color",     {r=255, g=255, b=255, a=200}, true)
+ui.NewSliderInt(TAB2, GESP, "Trail Length", 5, 60)
+
+-- [Debug & Config]
+ui.NewContainer(TAB2, VIS, "Debug & Config", { autosize = true, next = true })
+ui.newDropdown(TAB2, VIS, "Font", VIS_FONTS)
+ui.NewCheckbox(TAB2, VIS, "Debug Info")
+ui.NewCheckbox(TAB2, VIS, "Show Speed")
+ui.NewCheckbox(TAB2, VIS, "Show Distance")
+ui.NewCheckbox(TAB2, VIS, "Show GK Status")
+ui.NewMultiselect(TAB2, VIS, "ESP Outlines", {"Box", "Shape", "Goal", "Indicator", "Arrow", "Snap", "Trail"})
+ui.NewButton(TAB2, VIS, "Save Config",   function() config_save() end)
+ui.NewButton(TAB2, VIS, "Load Config",   function() config_load() end)
+ui.NewButton(TAB2, VIS, "Delete Config", function() file.delete(CONFIG_FILE) end)
+
+-- ── Defaults ───────────────────────────────────────────────────────────────
+
 ui.setValue(TAB, MAN, "Orbit Enabled", false)
 ui.setValue(TAB, MAN, "Radius",        3.5)
 ui.setValue(TAB, MAN, "Height",        10.0)
 ui.setValue(TAB, MAN, "Speed (rps)",   0.5)
 ui.setValue(TAB, MAN, "BC Enabled",    false)
 ui.setValue(TAB, MAN, "Move Speed",    15.0)
-ui.setValue(TAB, MAN, "Freeze Player",   true)
-ui.setValue(TAB, MAN, "Auto Dribble",   false)
-ui.setValue(TAB, MAN, "Dribble Radius", 10.50)
-ui.setValue(TAB, MAN, "Show Radius",     true)
-ui.setValue(TAB, MAN, "Linger",          true)
-ui.setValue(TAB, MAN, "Linger Radius",   11.50)
-ui.setValue(TAB, MAN, "Linger Time (ms)", 500)
+ui.setValue(TAB, MAN, "Freeze Player", true)
+
+ui.setValue(TAB, DRIB, "Auto Dribble",     false)
+ui.setValue(TAB, DRIB, "Dribble Radius",   10.50)
+ui.setValue(TAB, DRIB, "Show Radius",      true)
+ui.setValue(TAB, DRIB, "Linger",           true)
+ui.setValue(TAB, DRIB, "Linger Radius",    11.50)
+ui.setValue(TAB, DRIB, "Linger Time (ms)", 500)
 
 ui.setValue(TAB, FEAT, "Speed Enabled",     false)
 ui.setValue(TAB, FEAT, "Speed Multiplier",  2.0)
@@ -144,38 +173,40 @@ ui.setValue(TAB, FEAT, "Max Retries",       3)
 ui.setValue(TAB, FEAT, "Auto Goal",         false)
 ui.setValue(TAB, FEAT, "Goal Target",       0)
 
-ui.setValue(TAB, VIS, "Font",          1)
-ui.setValue(TAB, VIS, "Debug Info",  false)
-ui.setValue(TAB, VIS, "Show Speed",    true)
-ui.setValue(TAB, VIS, "Show Distance", true)
-ui.setValue(TAB, VIS, "Show GK Status", true)
-ui.setValue(TAB, VIS, "Ball ESP",      false)
-ui.setValue(TAB, VIS, "Box",           false)
-ui.setValue(TAB, VIS, "Ball Fill",     false)
-ui.setValue(TAB, VIS, "Ball ESP Text", true)
-ui.setValue(TAB, VIS, "Shape",         false)
-ui.setValue(TAB, VIS, "Shape Fill",    false)
-ui.setValue(TAB, VIS, "Shape Type",    0)
-ui.setValue(TAB, VIS, "Goal ESP",      false)
-ui.setValue(TAB, VIS, "Goal ESP Text", true)
-ui.setValue(TAB, VIS, "Goal Fill",     false)
-ui.setValue(TAB, VIS, "Shape Size",    30.0)
-ui.setValue(TAB, VIS, "Shape Spin",    false)
-ui.setValue(TAB, VIS, "Spin Speed",    1.0)
-ui.setValue(TAB, VIS, "Shape Breathe",    false)
-ui.setValue(TAB, VIS, "Breathe Amount",   0.2)
-ui.setValue(TAB, VIS, "Shape Thickness",  1.5)
-ui.setValue(TAB, VIS, "Shape Fill",       false)
-ui.setValue(TAB, VIS, "Ball Indicator",    false)
-ui.setValue(TAB, VIS, "Indicator Radius",  60.0)
-ui.setValue(TAB, VIS, "Velocity Arrow",   false)
-ui.setValue(TAB, VIS, "Arrow Scale",      1.0)
-ui.setValue(TAB, VIS, "Snap Line",        false)
-ui.setValue(TAB, VIS, "Ball Trail",       false)
-ui.setValue(TAB, VIS, "Trail Length",     20)
-ui.setValue(TAB, VIS, "ESP Outlines",     {true,true,true,true,true,true,true})
+ui.setValue(TAB2, BESP, "Ball ESP",         false)
+ui.setValue(TAB2, BESP, "Box",              false)
+ui.setValue(TAB2, BESP, "Ball Fill",        false)
+ui.setValue(TAB2, BESP, "Ball ESP Text",    true)
+ui.setValue(TAB2, BESP, "Shape",            false)
+ui.setValue(TAB2, BESP, "Shape Fill",       false)
+ui.setValue(TAB2, BESP, "Shape Type",       0)
+ui.setValue(TAB2, BESP, "Shape Size",       30.0)
+ui.setValue(TAB2, BESP, "Shape Spin",       false)
+ui.setValue(TAB2, BESP, "Spin Speed",       1.0)
+ui.setValue(TAB2, BESP, "Shape Breathe",    false)
+ui.setValue(TAB2, BESP, "Breathe Amount",   0.2)
+ui.setValue(TAB2, BESP, "Shape Thickness",  1.5)
+ui.setValue(TAB2, BESP, "Shape Fill",       false)
 
--- [Shared state]
+ui.setValue(TAB2, GESP, "Goal ESP",         false)
+ui.setValue(TAB2, GESP, "Goal ESP Text",    true)
+ui.setValue(TAB2, GESP, "Goal Fill",        false)
+ui.setValue(TAB2, GESP, "Ball Indicator",   false)
+ui.setValue(TAB2, GESP, "Indicator Radius", 60.0)
+ui.setValue(TAB2, GESP, "Velocity Arrow",   false)
+ui.setValue(TAB2, GESP, "Arrow Scale",      1.0)
+ui.setValue(TAB2, GESP, "Snap Line",        false)
+ui.setValue(TAB2, GESP, "Ball Trail",       false)
+ui.setValue(TAB2, GESP, "Trail Length",     20)
+
+ui.setValue(TAB2, VIS, "Font",           1)
+ui.setValue(TAB2, VIS, "Debug Info",     false)
+ui.setValue(TAB2, VIS, "Show Speed",     true)
+ui.setValue(TAB2, VIS, "Show Distance",  true)
+ui.setValue(TAB2, VIS, "Show GK Status", true)
+ui.setValue(TAB2, VIS, "ESP Outlines",   {true,true,true,true,true,true,true})
+
+-- ── Shared state ───────────────────────────────────────────────────────────
 
 local free_ball       = nil
 local held_ball       = nil
@@ -190,9 +221,9 @@ local _ball_track_t   = 0
 local prev_vel    = Vector3.new(0, 0, 0)
 local ball_status    = "---"
 local goal_boxes     = {}
-local player_gks     = {}  -- {name, in_penalty} for each real-player GK this tick
-local live_ball_center = nil  -- set each onPaint frame from GetPartCorners (live CFrame)
-local live_ball_part   = nil  -- the part that yielded live_ball_center (reused by box ESP)
+local player_gks     = {}
+local live_ball_center = nil
+local live_ball_part   = nil
 
 local COLOR_WHITE  = Color3.new(1, 1, 1)
 local COLOR_BLUE   = Color3.fromHex("#3E79A7")
@@ -219,8 +250,8 @@ local shape_breathe_t = 0.0
 
 local trail_positions = {}
 local _trail_last_t     = 0
-local _ball_was_held    = false  -- possession state last onPaint frame
-local _ball_release_t   = -10000 -- tick when ball last became free (ms)
+local _ball_was_held    = false
+local _ball_release_t   = -10000
 
 local hk_prev = {}
 
@@ -258,7 +289,7 @@ local ret_use_tween        = false
 
 local PTB_TIMEOUT = 3.0
 
--- [Helpers]
+-- ── Helpers ────────────────────────────────────────────────────────────────
 
 local function hotkey_clicked(label, container)
     local key  = container .. "|" .. label
@@ -283,7 +314,6 @@ local function now_sec()
     return utility.GetTickCount() / 1000
 end
 
--- ok=true → green (can fire), ok=false → red (blocked), ok=nil → yellow (neutral)
 local function set_tp_status(msg, ok)
     info_tp_status = msg
     if ok == true  then info_tp_color = COLOR_GREEN
@@ -316,8 +346,6 @@ local function get_ball_pos()
     end
     return nil
 end
-
--- [Camera axes for BC movement]
 
 local function get_cam_axes()
     local cam_pos = game.CameraPosition
@@ -352,8 +380,6 @@ local function get_cam_axes()
     return -rz, rx, rx, rz
 end
 
--- [Ball / char refresh]
-
 local function refresh_ball_refs()
     local ball_model = game.Workspace:FindFirstChild("Ball")
     free_ball  = ball_model and ball_model:FindFirstChild("RootPart") or nil
@@ -363,7 +389,6 @@ local function refresh_ball_refs()
     holder_char = nil
     gk_has_ball = false
 
-    -- Football.Char / Football.OnPlayer is the authoritative possession signal
     if world_ball then
         local ok, on_pl, char_val = pcall(function()
             local op = world_ball:FindFirstChild("OnPlayer")
@@ -373,7 +398,6 @@ local function refresh_ball_refs()
         if ok and on_pl and char_val and char_val.Parent then
             holder_char = char_val
             held_ball   = world_ball
-            -- AI GK models are not in the Players service; real players are
             local ok2, is_ai = pcall(function()
                 local players_svc = game.GetService("Players")
                 if players_svc and players_svc:FindFirstChild(char_val.Name) then
@@ -393,7 +417,6 @@ local function refresh_ball_refs()
         end
     end
 
-    -- fallback: scan AI GK models directly for HasBall (covers cases where Football.Char is unset)
     local ai_folder = game.Workspace:FindFirstChild("AI")
     if ai_folder then
         for _, team_folder in ipairs(ai_folder:GetChildren()) do
@@ -415,7 +438,6 @@ local function refresh_ball_refs()
         end
     end
 
-    -- fallback: scan player list for HasBall (covers edge cases)
     local ok_pl, all_players = pcall(function() return entity.GetPlayers(false) end)
     if ok_pl and all_players then
         for _, p in ipairs(all_players) do
@@ -468,8 +490,6 @@ local function bc_init()
     end
 end
 
--- [Goal refs]
-
 local function refresh_goal_refs()
     goal_boxes = {}
     local goals_folder = game.Workspace:FindFirstChild("Goals")
@@ -487,88 +507,90 @@ local function refresh_goal_refs()
     end
 end
 
--- [Config]
+-- ── Config ─────────────────────────────────────────────────────────────────
 
 local SAVE_WIDGETS = {
-    {MAN,  "Orbit Enabled",    "val"},
-    {MAN,  "Orbit Key",        "hk"},
-    {MAN,  "Radius",           "val"},
-    {MAN,  "Height",           "val"},
-    {MAN,  "Speed (rps)",      "val"},
-    {MAN,  "BC Enabled",       "val"},
-    {MAN,  "BC Key",           "hk"},
-    {MAN,  "Move Speed",       "val"},
-    {MAN,  "Freeze Player",    "val"},
-    {MAN,  "Auto Dribble",    "val"},
-    {MAN,  "Dribble Key",     "hk"},
-    {MAN,  "Dribble Radius",  "val"},
-    {MAN,  "Show Radius",      "val"},
-    {MAN,  "Linger",          "val"},
-    {MAN,  "Linger Radius",   "val"},
-    {MAN,  "Linger Time (ms)","val"},
-    {FEAT, "Speed Enabled",    "val"},
-    {FEAT, "Speed Key",        "hk"},
-    {FEAT, "Speed Multiplier", "val"},
-    {FEAT, "Smoothing",        "val"},
-    {FEAT, "Enable Speed Cap", "val"},
-    {FEAT, "Max Speed Cap",    "val"},
-    {FEAT, "Ball Arc",         "val"},
-    {FEAT, "Arc Key",          "hk"},
-    {FEAT, "Arc Level",        "val"},
-    {FEAT, "Teleport Enabled", "val"},
-    {FEAT, "Teleport Key",     "hk"},
-    {FEAT, "TP Mode",          "val"},
-    {FEAT, "Travel Mode",      "val"},
-    {FEAT, "Tween Time (sec)", "val"},
-    {FEAT, "Return Time (sec)","val"},
-    {FEAT, "Dwell Time (sec)", "val"},
-    {FEAT, "Steal Dwell (sec)","val"},
-    {FEAT, "Retry on Miss",    "val"},
-    {FEAT, "Max Retries",      "val"},
-
-    {FEAT, "Auto Goal",        "val"},
-    {FEAT, "Auto Goal Key",    "hk"},
-    {FEAT, "Goal Target",      "val"},
-    {VIS,  "Font",             "val"},
-    {VIS,  "Debug Info",     "val"},
-    {VIS,  "Ball ESP",         "val"},
-    {VIS,  "Box",              "val"},
-    {VIS,  "Ball Fill",        "val"},
-    {VIS,  "Ball Fill Color",  "val"},
-    {VIS,  "Ball Color",       "val"},
-    {VIS,  "Ball ESP Text",    "val"},
-    {VIS,  "Shape",            "val"},
-    {VIS,  "Shape Fill",       "val"},
-    {VIS,  "Shape Fill Color", "val"},
-    {VIS,  "Shape Color",      "val"},
-    {VIS,  "Shape Type",       "val"},
-    {VIS,  "Goal ESP",         "val"},
-    {VIS,  "Home Color",       "val"},
-    {VIS,  "Away Color",       "val"},
-    {VIS,  "Goal ESP Text",    "val"},
-    {VIS,  "Goal Fill",        "val"},
-    {VIS,  "Home Fill Color",  "val"},
-    {VIS,  "Away Fill Color",  "val"},
-    {VIS,  "Shape Size",       "val"},
-    {VIS,  "Shape Spin",       "val"},
-    {VIS,  "Spin Speed",       "val"},
-    {VIS,  "Shape Breathe",    "val"},
-    {VIS,  "Breathe Amount",   "val"},
-    {VIS,  "Shape Thickness",  "val"},
-    {VIS,  "Shape Fill",       "val"},
-    {VIS,  "Shape Fill Color", "val"},
-    {VIS,  "Ball Indicator",    "val"},
-    {VIS,  "Indicator Color",  "val"},
-    {VIS,  "Indicator Radius", "val"},
-    {VIS,  "Velocity Arrow",   "val"},
-    {VIS,  "Arrow Color",      "val"},
-    {VIS,  "Arrow Scale",      "val"},
-    {VIS,  "Snap Line",        "val"},
-    {VIS,  "Snap Color",       "val"},
-    {VIS,  "Ball Trail",       "val"},
-    {VIS,  "Trail Color",      "val"},
-    {VIS,  "Trail Length",     "val"},
-    {VIS,  "ESP Outlines",    "val"},
+    {MAN,  "Orbit Enabled",     "val"},
+    {MAN,  "Orbit Key",         "hk"},
+    {MAN,  "Radius",            "val"},
+    {MAN,  "Height",            "val"},
+    {MAN,  "Speed (rps)",       "val"},
+    {MAN,  "BC Enabled",        "val"},
+    {MAN,  "BC Key",            "hk"},
+    {MAN,  "Move Speed",        "val"},
+    {MAN,  "Freeze Player",     "val"},
+    {DRIB, "Auto Dribble",      "val"},
+    {DRIB, "Dribble Key",       "hk"},
+    {DRIB, "Dribble Radius",    "val"},
+    {DRIB, "Show Radius",       "val"},
+    {DRIB, "Linger",            "val"},
+    {DRIB, "Linger Radius",     "val"},
+    {DRIB, "Linger Time (ms)",  "val"},
+    {FEAT, "Speed Enabled",     "val"},
+    {FEAT, "Speed Key",         "hk"},
+    {FEAT, "Speed Multiplier",  "val"},
+    {FEAT, "Smoothing",         "val"},
+    {FEAT, "Enable Speed Cap",  "val"},
+    {FEAT, "Max Speed Cap",     "val"},
+    {FEAT, "Ball Arc",          "val"},
+    {FEAT, "Arc Key",           "hk"},
+    {FEAT, "Arc Level",         "val"},
+    {FEAT, "Teleport Enabled",  "val"},
+    {FEAT, "Teleport Key",      "hk"},
+    {FEAT, "TP Mode",           "val"},
+    {FEAT, "Travel Mode",       "val"},
+    {FEAT, "Tween Time (sec)",  "val"},
+    {FEAT, "Return Time (sec)", "val"},
+    {FEAT, "Dwell Time (sec)",  "val"},
+    {FEAT, "Steal Dwell (sec)", "val"},
+    {FEAT, "Retry on Miss",     "val"},
+    {FEAT, "Max Retries",       "val"},
+    {FEAT, "Auto Goal",         "val"},
+    {FEAT, "Auto Goal Key",     "hk"},
+    {FEAT, "Goal Target",       "val"},
+    {BESP, "Ball ESP",          "val"},
+    {BESP, "Box",               "val"},
+    {BESP, "Ball Fill",         "val"},
+    {BESP, "Ball Fill Color",   "val"},
+    {BESP, "Ball Color",        "val"},
+    {BESP, "Ball ESP Text",     "val"},
+    {BESP, "Shape",             "val"},
+    {BESP, "Shape Fill",        "val"},
+    {BESP, "Shape Fill Color",  "val"},
+    {BESP, "Shape Color",       "val"},
+    {BESP, "Shape Type",        "val"},
+    {BESP, "Shape Size",        "val"},
+    {BESP, "Shape Spin",        "val"},
+    {BESP, "Spin Speed",        "val"},
+    {BESP, "Shape Breathe",     "val"},
+    {BESP, "Breathe Amount",    "val"},
+    {BESP, "Shape Thickness",   "val"},
+    {BESP, "Shape Fill",        "val"},
+    {BESP, "Shape Fill Color",  "val"},
+    {GESP, "Goal ESP",          "val"},
+    {GESP, "Home Color",        "val"},
+    {GESP, "Away Color",        "val"},
+    {GESP, "Goal ESP Text",     "val"},
+    {GESP, "Goal Fill",         "val"},
+    {GESP, "Home Fill Color",   "val"},
+    {GESP, "Away Fill Color",   "val"},
+    {GESP, "Ball Indicator",    "val"},
+    {GESP, "Indicator Color",   "val"},
+    {GESP, "Indicator Radius",  "val"},
+    {GESP, "Velocity Arrow",    "val"},
+    {GESP, "Arrow Color",       "val"},
+    {GESP, "Arrow Scale",       "val"},
+    {GESP, "Snap Line",         "val"},
+    {GESP, "Snap Color",        "val"},
+    {GESP, "Ball Trail",        "val"},
+    {GESP, "Trail Color",       "val"},
+    {GESP, "Trail Length",      "val"},
+    {VIS,  "Font",              "val"},
+    {VIS,  "Debug Info",        "val"},
+    {VIS,  "Show Speed",        "val"},
+    {VIS,  "Show Distance",     "val"},
+    {VIS,  "Show GK Status",    "val"},
+    {VIS,  "ESP Outlines",      "val"},
 }
 
 local function ser(v)
@@ -591,10 +613,10 @@ config_save = function()
         local container, label, wtype = w[1], w[2], w[3]
         local val
         if wtype == "hk" then
-            local hk = ui.getHotkey(TAB, container, label)
+            local hk = ui.getHotkey(ct(container), container, label)
             val = hk and hk.key or 0
         else
-            val = ui.getValue(TAB, container, label)
+            val = ui.getValue(ct(container), container, label)
         end
         lines[#lines + 1] = string.format("  [%q]=%s,", container .. "|" .. label, ser(val))
     end
@@ -613,14 +635,14 @@ config_load = function()
         local container, label = w[1], w[2]
         local val = data[container .. "|" .. label]
         if val ~= nil then
-            pcall(function() ui.setValue(TAB, container, label, val) end)
+            pcall(function() ui.setValue(ct(container), container, label, val) end)
         end
     end
 end
 
-config_load()  -- auto-load on startup
+config_load()
 
--- [Update: local possession (runs every ~5ms so it's ahead of the 33ms ball-ref refresh)]
+-- ── onUpdate: local possession ─────────────────────────────────────────────
 
 cheat.register("onUpdate", function()
     local lp   = game.LocalPlayer
@@ -631,11 +653,11 @@ cheat.register("onUpdate", function()
     local_has_ball = ok and v or false
 end)
 
--- [Slow update: goal refs]
+-- ── onSlowUpdate: goal refs ────────────────────────────────────────────────
 
 cheat.register("onSlowUpdate", refresh_goal_refs)
 
--- [Update: ball/char refresh]
+-- ── onUpdate: ball/char refresh ───────────────────────────────────────────
 
 local _last_refresh = 0
 cheat.register("onUpdate", function()
@@ -645,7 +667,6 @@ cheat.register("onUpdate", function()
     refresh_ball_refs()
     refresh_local_char()
 
-    -- refresh enemy GK: real player first, AI fallback
     player_gks = {}
     local lp_team = nil
     pcall(function()
@@ -682,7 +703,6 @@ cheat.register("onUpdate", function()
         end
     end
 
-    -- stale detection: position-based (1s threshold) for ball genuinely stuck/glitched
     ball_is_stale = false
     do
         local raw_pos
@@ -713,7 +733,7 @@ cheat.register("onUpdate", function()
     if local_char and not local_char.Parent then local_char = nil end
 end)
 
--- [Update: ball distance info]
+-- ── onUpdate: ball distance info ──────────────────────────────────────────
 
 cheat.register("onUpdate", function()
     local ball_pos = get_ball_pos()
@@ -725,7 +745,7 @@ cheat.register("onUpdate", function()
     end
 end)
 
--- [Update: conditional visibility]
+-- ── onUpdate: conditional visibility ─────────────────────────────────────
 
 cheat.register("onUpdate", function()
     local tp_on  = ui.getValue(TAB, FEAT, "Teleport Enabled")
@@ -755,67 +775,67 @@ cheat.register("onUpdate", function()
     ui.SetVisibility(TAB, FEAT, "Auto Goal",          tp_on)
     ui.SetVisibility(TAB, FEAT, "Goal Target",        auto_g)
 
-    local ball_esp  = ui.getValue(TAB, VIS, "Ball ESP")
-    local box_on    = ball_esp and ui.getValue(TAB, VIS, "Box")
-    local shape_on  = ball_esp and ui.getValue(TAB, VIS, "Shape")
-    local spin_on   = shape_on and ui.getValue(TAB, VIS, "Shape Spin")
-    local breathe_on = shape_on and ui.getValue(TAB, VIS, "Shape Breathe")
-    local goal_esp  = ui.getValue(TAB, VIS, "Goal ESP")
-    local goal_fill = goal_esp and ui.getValue(TAB, VIS, "Goal Fill")
+    local ball_esp   = ui.getValue(TAB2, BESP, "Ball ESP")
+    local box_on     = ball_esp and ui.getValue(TAB2, BESP, "Box")
+    local shape_on   = ball_esp and ui.getValue(TAB2, BESP, "Shape")
+    local spin_on    = shape_on and ui.getValue(TAB2, BESP, "Shape Spin")
+    local breathe_on = shape_on and ui.getValue(TAB2, BESP, "Shape Breathe")
+    local goal_esp   = ui.getValue(TAB2, GESP, "Goal ESP")
+    local goal_fill  = goal_esp and ui.getValue(TAB2, GESP, "Goal Fill")
 
-    ui.SetVisibility(TAB, VIS, "Box",              ball_esp)
-    ui.SetVisibility(TAB, VIS, "Ball Color",       ball_esp)
-    ui.SetVisibility(TAB, VIS, "Ball Fill",        box_on)
-    ui.SetVisibility(TAB, VIS, "Ball Fill Color",  box_on)
-    ui.SetVisibility(TAB, VIS, "Ball ESP Text",    box_on)
-    ui.SetVisibility(TAB, VIS, "Shape",            ball_esp)
-    ui.SetVisibility(TAB, VIS, "Shape Color",      ball_esp)
-    ui.SetVisibility(TAB, VIS, "Shape Fill",       shape_on)
-    ui.SetVisibility(TAB, VIS, "Shape Fill Color", shape_on)
-    ui.SetVisibility(TAB, VIS, "Shape Type",       shape_on)
-    ui.SetVisibility(TAB, VIS, "Shape Size",       shape_on)
-    ui.SetVisibility(TAB, VIS, "Shape Spin",       shape_on)
-    ui.SetVisibility(TAB, VIS, "Spin Speed",       spin_on)
-    ui.SetVisibility(TAB, VIS, "Shape Breathe",    shape_on)
-    ui.SetVisibility(TAB, VIS, "Breathe Amount",   breathe_on)
-    ui.SetVisibility(TAB, VIS, "Shape Thickness",  shape_on)
-    ui.SetVisibility(TAB, VIS, "Shape Fill",       shape_on)
-    ui.SetVisibility(TAB, VIS, "Shape Fill Color", shape_fill_on)
-    ui.SetVisibility(TAB, VIS, "Home Color",       goal_esp)
-    ui.SetVisibility(TAB, VIS, "Away Color",       goal_esp)
-    ui.SetVisibility(TAB, VIS, "Goal ESP Text",    goal_esp)
-    ui.SetVisibility(TAB, VIS, "Goal Fill",        goal_esp)
-    ui.SetVisibility(TAB, VIS, "Home Fill Color",  goal_fill)
-    ui.SetVisibility(TAB, VIS, "Away Fill Color",  goal_fill)
+    ui.SetVisibility(TAB2, BESP, "Box",              ball_esp)
+    ui.SetVisibility(TAB2, BESP, "Ball Color",       ball_esp)
+    ui.SetVisibility(TAB2, BESP, "Ball Fill",        box_on)
+    ui.SetVisibility(TAB2, BESP, "Ball Fill Color",  box_on)
+    ui.SetVisibility(TAB2, BESP, "Ball ESP Text",    box_on)
+    ui.SetVisibility(TAB2, BESP, "Shape",            ball_esp)
+    ui.SetVisibility(TAB2, BESP, "Shape Color",      ball_esp)
+    ui.SetVisibility(TAB2, BESP, "Shape Fill",       shape_on)
+    ui.SetVisibility(TAB2, BESP, "Shape Fill Color", shape_on)
+    ui.SetVisibility(TAB2, BESP, "Shape Type",       shape_on)
+    ui.SetVisibility(TAB2, BESP, "Shape Size",       shape_on)
+    ui.SetVisibility(TAB2, BESP, "Shape Spin",       shape_on)
+    ui.SetVisibility(TAB2, BESP, "Spin Speed",       spin_on)
+    ui.SetVisibility(TAB2, BESP, "Shape Breathe",    shape_on)
+    ui.SetVisibility(TAB2, BESP, "Breathe Amount",   breathe_on)
+    ui.SetVisibility(TAB2, BESP, "Shape Thickness",  shape_on)
+    ui.SetVisibility(TAB2, BESP, "Shape Fill",       shape_on)
+    ui.SetVisibility(TAB2, BESP, "Shape Fill Color", shape_fill_on)
+    ui.SetVisibility(TAB2, GESP, "Home Color",       goal_esp)
+    ui.SetVisibility(TAB2, GESP, "Away Color",       goal_esp)
+    ui.SetVisibility(TAB2, GESP, "Goal ESP Text",    goal_esp)
+    ui.SetVisibility(TAB2, GESP, "Goal Fill",        goal_esp)
+    ui.SetVisibility(TAB2, GESP, "Home Fill Color",  goal_fill)
+    ui.SetVisibility(TAB2, GESP, "Away Fill Color",  goal_fill)
 
-    local ind_on   = ui.getValue(TAB, VIS, "Ball Indicator")
-    local arrow_on = ui.getValue(TAB, VIS, "Velocity Arrow")
-    local snap_on  = ui.getValue(TAB, VIS, "Snap Line")
-    local trail_on = ui.getValue(TAB, VIS, "Ball Trail")
-    ui.SetVisibility(TAB, VIS, "Indicator Color",  ind_on)
-    ui.SetVisibility(TAB, VIS, "Indicator Radius", ind_on)
-    ui.SetVisibility(TAB, VIS, "Arrow Color",     arrow_on)
-    ui.SetVisibility(TAB, VIS, "Arrow Scale",     arrow_on)
-    ui.SetVisibility(TAB, VIS, "Snap Color",      snap_on)
-    ui.SetVisibility(TAB, VIS, "Trail Color",     trail_on)
-    ui.SetVisibility(TAB, VIS, "Trail Length",    trail_on)
+    local ind_on   = ui.getValue(TAB2, GESP, "Ball Indicator")
+    local arrow_on = ui.getValue(TAB2, GESP, "Velocity Arrow")
+    local snap_on  = ui.getValue(TAB2, GESP, "Snap Line")
+    local trail_on = ui.getValue(TAB2, GESP, "Ball Trail")
+    ui.SetVisibility(TAB2, GESP, "Indicator Color",  ind_on)
+    ui.SetVisibility(TAB2, GESP, "Indicator Radius", ind_on)
+    ui.SetVisibility(TAB2, GESP, "Arrow Color",      arrow_on)
+    ui.SetVisibility(TAB2, GESP, "Arrow Scale",      arrow_on)
+    ui.SetVisibility(TAB2, GESP, "Snap Color",       snap_on)
+    ui.SetVisibility(TAB2, GESP, "Trail Color",      trail_on)
+    ui.SetVisibility(TAB2, GESP, "Trail Length",     trail_on)
 
-    local info_on = ui.getValue(TAB, VIS, "Debug Info")
-    ui.SetVisibility(TAB, VIS, "Show Speed",    info_on)
-    ui.SetVisibility(TAB, VIS, "Show Distance", info_on)
-    ui.SetVisibility(TAB, VIS, "Show GK Status", info_on)
+    local info_on = ui.getValue(TAB2, VIS, "Debug Info")
+    ui.SetVisibility(TAB2, VIS, "Show Speed",     info_on)
+    ui.SetVisibility(TAB2, VIS, "Show Distance",  info_on)
+    ui.SetVisibility(TAB2, VIS, "Show GK Status", info_on)
 
-    local dribble_on = ui.getValue(TAB, MAN, "Auto Dribble")
-    local linger_on  = dribble_on and ui.getValue(TAB, MAN, "Linger")
-    ui.SetVisibility(TAB, MAN, "Dribble Key",      dribble_on)
-    ui.SetVisibility(TAB, MAN, "Dribble Radius",   dribble_on)
-    ui.SetVisibility(TAB, MAN, "Show Radius",      dribble_on)
-    ui.SetVisibility(TAB, MAN, "Linger",           dribble_on)
-    ui.SetVisibility(TAB, MAN, "Linger Radius",    linger_on)
-    ui.SetVisibility(TAB, MAN, "Linger Time (ms)", linger_on)
+    local dribble_on = ui.getValue(TAB, DRIB, "Auto Dribble")
+    local linger_on  = dribble_on and ui.getValue(TAB, DRIB, "Linger")
+    ui.SetVisibility(TAB, DRIB, "Dribble Key",      dribble_on)
+    ui.SetVisibility(TAB, DRIB, "Dribble Radius",   dribble_on)
+    ui.SetVisibility(TAB, DRIB, "Show Radius",      dribble_on)
+    ui.SetVisibility(TAB, DRIB, "Linger",           dribble_on)
+    ui.SetVisibility(TAB, DRIB, "Linger Radius",    linger_on)
+    ui.SetVisibility(TAB, DRIB, "Linger Time (ms)", linger_on)
 end)
 
--- [Update: ball physics (speed / arc)]
+-- ── onUpdate: ball physics (speed / arc) ──────────────────────────────────
 
 cheat.register("onUpdate", function()
     local spd_enabled = ui.getValue(TAB, FEAT, "Speed Enabled")
@@ -899,7 +919,7 @@ cheat.register("onUpdate", function()
     end
 end)
 
--- [Update: orbit + ball control]
+-- ── onUpdate: orbit + ball control ────────────────────────────────────────
 
 cheat.register("onUpdate", function()
     local orb_enabled = ui.getValue(TAB, MAN, "Orbit Enabled")
@@ -1006,7 +1026,7 @@ cheat.register("onUpdate", function()
     end
 end)
 
--- [Update: teleport]
+-- ── onUpdate: teleport ────────────────────────────────────────────────────
 
 cheat.register("onUpdate", function()
     if not ui.getValue(TAB, FEAT, "Teleport Enabled") then
@@ -1080,14 +1100,12 @@ cheat.register("onUpdate", function()
     local clicked = hotkey_clicked("Teleport Key", FEAT)
 
     if mode == 0 then
-        -- Ball to Player: continuous glue
         if hotkey_is_hold("Teleport Key", FEAT) then
             glue_active = ui.getValue(TAB, FEAT, "Teleport Key") == true
         elseif clicked then
             glue_active = not glue_active
         end
 
-        -- Block if any non-local player holds the ball
         local is_local_holding = local_has_ball
             or (holder_char and local_char and holder_char.Name == local_char.Name)
 
@@ -1121,7 +1139,6 @@ cheat.register("onUpdate", function()
         local is_local_holding = local_has_ball
             or (holder_char and local_char and holder_char.Name == local_char.Name)
 
-        -- block if AI GK has the ball, or if a real player GK has it while in the box
         local gk_block = false
         local gk_block_reason = ""
         if gk_has_ball then
@@ -1132,11 +1149,9 @@ cheat.register("onUpdate", function()
                 local vals   = holder_char:FindFirstChild("Values")
                 local goalie = vals and vals:FindFirstChild("Goalie")
                 if not (goalie and (goalie.Value == true or goalie.Value == 1)) then return nil end
-                -- AI GKs are not in the Players service; real players are
                 local players_svc = game.GetService("Players")
                 local is_real = players_svc and players_svc:FindFirstChild(holder_char.Name)
                 if not is_real then return "AI GK has ball" end
-                -- Real player GK: only block while they are inside the penalty box
                 local in_pen = vals and vals:FindFirstChild("IsInPenalty")
                 if in_pen and (in_pen.Value == true or in_pen.Value == 1) then
                     return "GK in box"
@@ -1383,7 +1398,7 @@ cheat.register("onUpdate", function()
     end
 end)
 
--- [Update: auto goal]
+-- ── onUpdate: auto goal ───────────────────────────────────────────────────
 
 cheat.register("onUpdate", function()
     if not ui.getValue(TAB, FEAT, "Auto Goal") then
@@ -1455,24 +1470,23 @@ cheat.register("onUpdate", function()
     end)
 end)
 
--- [Update: auto dribble]
+-- ── onUpdate: auto dribble ────────────────────────────────────────────────
 
 cheat.register("onUpdate", function()
-    -- release q once its hold duration has elapsed
     if dribble_q_down and (now_sec() - dribble_q_time) >= 0.15 then
         keyboard.Release("q")
         dribble_q_down = false
     end
 
-    if not ui.getValue(TAB, MAN, "Auto Dribble") then
+    if not ui.getValue(TAB, DRIB, "Auto Dribble") then
         if dribble_q_down then keyboard.Release("q"); dribble_q_down = false end
         auto_dribble_active = false
         return
     end
 
-    if hotkey_is_hold("Dribble Key", MAN) then
-        auto_dribble_active = ui.getValue(TAB, MAN, "Dribble Key") == true
-    elseif hotkey_clicked("Dribble Key", MAN) then
+    if hotkey_is_hold("Dribble Key", DRIB) then
+        auto_dribble_active = ui.getValue(TAB, DRIB, "Dribble Key") == true
+    elseif hotkey_clicked("Dribble Key", DRIB) then
         auto_dribble_active = not auto_dribble_active
     end
 
@@ -1483,7 +1497,6 @@ cheat.register("onUpdate", function()
     local lp   = entity.GetLocalPlayer()
     local lpos = lp and lp:GetBonePosition("HumanoidRootPart")
 
-    -- scan enemies (always runs so HUD stays live when inactive)
     dribble_enemy_near   = false
     dribble_enemy_slide  = false
     dribble_linger_near  = false
@@ -1491,12 +1504,11 @@ cheat.register("onUpdate", function()
 
     if lpos then
         local now_t      = utility.GetTickCount()
-        local main_r     = ui.getValue(TAB, MAN, "Dribble Radius")    or 6.0
-        local linger_enabled = ui.getValue(TAB, MAN, "Linger")
-        local linger_r   = linger_enabled and (ui.getValue(TAB, MAN, "Linger Radius")    or 4.5)
-        local linger_ms  = linger_enabled and (ui.getValue(TAB, MAN, "Linger Time (ms)") or 150)
+        local main_r     = ui.getValue(TAB, DRIB, "Dribble Radius")    or 6.0
+        local linger_enabled = ui.getValue(TAB, DRIB, "Linger")
+        local linger_r   = linger_enabled and (ui.getValue(TAB, DRIB, "Linger Radius")    or 4.5)
+        local linger_ms  = linger_enabled and (ui.getValue(TAB, DRIB, "Linger Time (ms)") or 150)
 
-        -- update position history and find the past position for the linger zone
         dribble_pos_history[#dribble_pos_history + 1] = {lpos, now_t}
         while #dribble_pos_history > 1 and now_t - dribble_pos_history[1][2] > 2000 do
             table.remove(dribble_pos_history, 1)
@@ -1563,7 +1575,7 @@ cheat.register("onUpdate", function()
     end
 end)
 
--- [Paint: cam axes + draw]
+-- ── onPaint ───────────────────────────────────────────────────────────────
 
 local function get_part_hull(part)
     local corners = draw.GetPartCorners(part)
@@ -1596,13 +1608,11 @@ local function draw_hull_fill(hull, color, alpha)
 end
 
 cheat.register("onPaint", function()
-    -- Compute live ball center from GetPartCorners (reads render-thread CFrame, not stale .Position)
     do
         live_ball_center = nil
         live_ball_part   = nil
         local bp
         if local_has_ball and local_char and local_char.Parent then
-            -- local player holds ball: read from character's ball part (avoids stale Football.Position)
             bp = local_char:FindFirstChild("PlrFootball")
               or local_char:FindFirstChild("Hitbox")
               or (held_ball and held_ball.Parent and held_ball)
@@ -1631,8 +1641,6 @@ cheat.register("onPaint", function()
                 if ok and p then live_ball_center = p end
             end
         end
-        -- Suppress ESP for 100ms after any held→free transition while Football
-        -- re-settles to its kicked position (avoids snapping to the reset origin)
         local now_t       = utility.GetTickCount()
         local is_held     = local_has_ball or gk_has_ball or (holder_char ~= nil)
         if _ball_was_held and not is_held then
@@ -1645,8 +1653,7 @@ cheat.register("onPaint", function()
         end
     end
 
-    -- Trail accumulation throttled to ~33ms so point spacing is frame-rate independent
-    if ui.getValue(TAB, VIS, "Ball Trail") then
+    if ui.getValue(TAB2, GESP, "Ball Trail") then
         local trail_now = utility.GetTickCount()
         if trail_now - _trail_last_t >= 33 then
             _trail_last_t = trail_now
@@ -1664,9 +1671,9 @@ cheat.register("onPaint", function()
         cam_fwx, cam_fwz, cam_rx, cam_rz = fwx, fwz, rx, rz
     end
 
-    local font = VIS_FONTS[(ui.getValue(TAB, VIS, "Font") or 0) + 1] or "Tahoma"
+    local font = VIS_FONTS[(ui.getValue(TAB2, VIS, "Font") or 0) + 1] or "Tahoma"
 
-    local _ol    = ui.getValue(TAB, VIS, "ESP Outlines") or {}
+    local _ol    = ui.getValue(TAB2, VIS, "ESP Outlines") or {}
     local ol_box = _ol[1]; local ol_shape = _ol[2]; local ol_goal  = _ol[3]
     local ol_ind = _ol[4]; local ol_arrow = _ol[5]; local ol_snap  = _ol[6]
     local ol_trail = _ol[7]
@@ -1690,7 +1697,7 @@ cheat.register("onPaint", function()
         info_speed = 0
     end
 
-    if ui.getValue(TAB, VIS, "Debug Info") then
+    if ui.getValue(TAB2, VIS, "Debug Info") then
         local _sw, sh = cheat.GetWindowSize()
         local x       = 10
         local lines = {}
@@ -1704,14 +1711,14 @@ cheat.register("onPaint", function()
         end
 
         add("[ DEBUG ]", COLOR_YELLOW)
-        if ui.getValue(TAB, VIS, "Show Speed") then
+        if ui.getValue(TAB2, VIS, "Show Speed") then
             local display_status = local_has_ball and "You (held)" or ball_status
             add(tostring(info_speed) .. " st/s  " .. display_status)
         end
-        if ui.getValue(TAB, VIS, "Show Distance") then
+        if ui.getValue(TAB2, VIS, "Show Distance") then
             add("Dist  " .. info_dist)
         end
-        if ui.getValue(TAB, VIS, "Show GK Status") then
+        if ui.getValue(TAB2, VIS, "Show GK Status") then
             for _, gk in ipairs(player_gks) do
                 if gk.is_ai then
                     add("GK [AI]", COLOR_YELLOW)
@@ -1748,11 +1755,11 @@ cheat.register("onPaint", function()
             local state = bc_active and "On" or "Ready"
             add("BC" .. hk_str(MAN, "BC Key") .. "  " .. state, bc_active and COLOR_GREEN or COLOR_YELLOW)
         end
-        if ui.getValue(TAB, MAN, "Auto Dribble") then
+        if ui.getValue(TAB, DRIB, "Auto Dribble") then
             local state    = auto_dribble_active and "On" or "Ready"
             local any_near = dribble_enemy_near  or dribble_linger_near
             local any_slide = dribble_enemy_slide or dribble_linger_slide
-            add("Dribble" .. hk_str(MAN, "Dribble Key") .. "  " .. state, auto_dribble_active and COLOR_GREEN or COLOR_YELLOW)
+            add("Dribble" .. hk_str(DRIB, "Dribble Key") .. "  " .. state, auto_dribble_active and COLOR_GREEN or COLOR_YELLOW)
             add("  Near   " .. (any_near  and "YES" or "NO"), any_near  and COLOR_RED or COLOR_GREEN)
             add("  Slide  " .. (any_slide and "YES" or "NO"), any_slide and COLOR_RED or COLOR_GREEN)
         end
@@ -1764,11 +1771,11 @@ cheat.register("onPaint", function()
         end
     end
 
-    if ui.getValue(TAB, MAN, "Auto Dribble") and ui.getValue(TAB, MAN, "Show Radius") then
+    if ui.getValue(TAB, DRIB, "Auto Dribble") and ui.getValue(TAB, DRIB, "Show Radius") then
         local lp   = entity.GetLocalPlayer()
         local lpos = lp and lp:GetBonePosition("HumanoidRootPart")
         if lpos then
-            local radius   = ui.getValue(TAB, MAN, "Dribble Radius") or 6.0
+            local radius   = ui.getValue(TAB, DRIB, "Dribble Radius") or 6.0
             local ring_col = dribble_enemy_slide and Color3.fromRGB(255, 50, 50)
                           or dribble_enemy_near  and Color3.fromRGB(255, 160, 0)
                           or Color3.fromRGB(80, 255, 80)
@@ -1783,9 +1790,9 @@ cheat.register("onPaint", function()
                 draw.Polyline(pts, ring_col, #pts == 32, 1.0, 180)
             end
 
-            if ui.getValue(TAB, MAN, "Linger") then
-                local linger_ms  = ui.getValue(TAB, MAN, "Linger Time (ms)") or 150
-                local linger_r   = ui.getValue(TAB, MAN, "Linger Radius")    or 4.5
+            if ui.getValue(TAB, DRIB, "Linger") then
+                local linger_ms  = ui.getValue(TAB, DRIB, "Linger Time (ms)") or 150
+                local linger_r   = ui.getValue(TAB, DRIB, "Linger Radius")    or 4.5
                 local now_t      = utility.GetTickCount()
                 local linger_pos = nil
                 for i = #dribble_pos_history, 1, -1 do
@@ -1813,14 +1820,14 @@ cheat.register("onPaint", function()
         end
     end
 
-    local ball_esp_on  = ui.getValue(TAB, VIS, "Ball ESP")
-    local box_on       = ball_esp_on and ui.getValue(TAB, VIS, "Box")
-    local ball_fill_on = box_on and ui.getValue(TAB, VIS, "Ball Fill")
+    local ball_esp_on  = ui.getValue(TAB2, BESP, "Ball ESP")
+    local box_on       = ball_esp_on and ui.getValue(TAB2, BESP, "Box")
+    local ball_fill_on = box_on and ui.getValue(TAB2, BESP, "Ball Fill")
     if box_on or ball_fill_on then
-        local ball_col_t      = ui.getValue(TAB, VIS, "Ball Color") or {}
+        local ball_col_t      = ui.getValue(TAB2, BESP, "Ball Color") or {}
         local ball_color      = picker_to_color3(ball_col_t)
         local ball_alpha      = ball_col_t.a or 255
-        local ball_fill_t     = ui.getValue(TAB, VIS, "Ball Fill Color") or {}
+        local ball_fill_t     = ui.getValue(TAB2, BESP, "Ball Fill Color") or {}
         local ball_fill_color = picker_to_color3(ball_fill_t)
         local ball_fill_alpha = ball_fill_t.a or 60
 
@@ -1834,7 +1841,7 @@ cheat.register("onPaint", function()
                 draw_hull_box(hull, ball_color, ball_alpha)
             end
 
-            if box_on and ui.getValue(TAB, VIS, "Ball ESP Text") then
+            if box_on and ui.getValue(TAB2, BESP, "Ball ESP Text") then
                 local ok, sx, sy, on = pcall(function()
                     return utility.WorldToScreen(ball_part.Position + Vector3.new(0, 4, 0))
                 end)
@@ -1854,20 +1861,20 @@ cheat.register("onPaint", function()
         end
     end
 
-    local goal_esp_on  = ui.getValue(TAB, VIS, "Goal ESP")
-    local goal_fill_on = goal_esp_on and ui.getValue(TAB, VIS, "Goal Fill")
+    local goal_esp_on  = ui.getValue(TAB2, GESP, "Goal ESP")
+    local goal_fill_on = goal_esp_on and ui.getValue(TAB2, GESP, "Goal Fill")
     if goal_esp_on then
-        local home_col_t    = ui.getValue(TAB, VIS, "Home Color") or {}
-        local away_col_t    = ui.getValue(TAB, VIS, "Away Color") or {}
+        local home_col_t    = ui.getValue(TAB2, GESP, "Home Color") or {}
+        local away_col_t    = ui.getValue(TAB2, GESP, "Away Color") or {}
         local home_color    = picker_to_color3(home_col_t)
         local away_color    = picker_to_color3(away_col_t)
         local home_alpha    = home_col_t.a or 255
         local away_alpha    = away_col_t.a or 255
-        local home_fill_t   = ui.getValue(TAB, VIS, "Home Fill Color") or {}
-        local away_fill_t   = ui.getValue(TAB, VIS, "Away Fill Color") or {}
+        local home_fill_t   = ui.getValue(TAB2, GESP, "Home Fill Color") or {}
+        local away_fill_t   = ui.getValue(TAB2, GESP, "Away Fill Color") or {}
         local home_fill_col = picker_to_color3(home_fill_t)
         local away_fill_col = picker_to_color3(away_fill_t)
-        local goal_text_on  = ui.getValue(TAB, VIS, "Goal ESP Text")
+        local goal_text_on  = ui.getValue(TAB2, GESP, "Goal ESP Text")
 
         for _, entry in ipairs(goal_boxes) do
             local gb = entry.part
@@ -1894,6 +1901,15 @@ cheat.register("onPaint", function()
             end
         end
     end
+end)
+
+-- Shape / trail / snap / arrow / indicator are split into a second onPaint
+-- to keep the first closure under Lua's 60-upvalue limit.
+cheat.register("onPaint", function()
+    local _ol      = ui.getValue(TAB2, VIS, "ESP Outlines") or {}
+    local ol_shape = _ol[2]; local ol_trail = _ol[7]; local ol_snap  = _ol[6]
+    local ol_arrow = _ol[5]; local ol_ind   = _ol[4]
+    local ball_esp_on = ui.getValue(TAB2, BESP, "Ball ESP")
 
     -- [Shape ESP]
     local now_tick = utility.GetTickCount()
@@ -1901,40 +1917,39 @@ cheat.register("onPaint", function()
     shape_last      = now_tick
     shape_breathe_t = shape_breathe_t + shape_dt
 
-    if ball_esp_on and ui.getValue(TAB, VIS, "Shape") then
+    if ball_esp_on and ui.getValue(TAB2, BESP, "Shape") then
         local ball_pos = live_ball_center
         if ball_pos then
             local ok, bsx, bsy, bon = pcall(function()
                 return utility.WorldToScreen(ball_pos)
             end)
             if ok and bon then
-                if ui.getValue(TAB, VIS, "Shape Spin") then
-                    local spd = ui.getValue(TAB, VIS, "Spin Speed")
+                if ui.getValue(TAB2, BESP, "Shape Spin") then
+                    local spd = ui.getValue(TAB2, BESP, "Spin Speed")
                     shape_angle = shape_angle + shape_dt * spd * pi2
                     if shape_angle > pi2 then shape_angle = shape_angle - pi2 end
                 else
                     shape_angle = 0
                 end
 
-                local base_size = ui.getValue(TAB, VIS, "Shape Size")
+                local base_size = ui.getValue(TAB2, BESP, "Shape Size")
                 local size      = base_size
-                if ui.getValue(TAB, VIS, "Shape Breathe") then
-                    local amt = ui.getValue(TAB, VIS, "Breathe Amount")
+                if ui.getValue(TAB2, BESP, "Shape Breathe") then
+                    local amt = ui.getValue(TAB2, BESP, "Breathe Amount")
                     size = base_size * (1.0 + amt * sin(shape_breathe_t * pi2))
                 end
 
-                local shape_col_t  = ui.getValue(TAB, VIS, "Shape Color") or {}
+                local shape_col_t  = ui.getValue(TAB2, BESP, "Shape Color") or {}
                 local shape_color  = picker_to_color3(shape_col_t)
                 local shape_alpha  = shape_col_t.a or 255
-                local shape_idx    = ui.getValue(TAB, VIS, "Shape Type") or 0
-                local thickness    = ui.getValue(TAB, VIS, "Shape Thickness") or 1.5
-                local fill_on      = ui.getValue(TAB, VIS, "Shape Fill")
-                local fill_col_t   = fill_on and (ui.getValue(TAB, VIS, "Shape Fill Color") or {}) or {}
+                local shape_idx    = ui.getValue(TAB2, BESP, "Shape Type") or 0
+                local thickness    = ui.getValue(TAB2, BESP, "Shape Thickness") or 1.5
+                local fill_on      = ui.getValue(TAB2, BESP, "Shape Fill")
+                local fill_col_t   = fill_on and (ui.getValue(TAB2, BESP, "Shape Fill Color") or {}) or {}
                 local fill_color   = picker_to_color3(fill_col_t)
                 local fill_alpha   = fill_col_t.a or 50
 
                 if shape_idx == 0 then
-                    -- Star of David: two equilateral triangles
                     local pts1, pts2 = {}, {}
                     local base = shape_angle - pi * 0.5
                     for i = 0, 2 do
@@ -1955,7 +1970,6 @@ cheat.register("onPaint", function()
                     draw.Polyline(pts2, shape_color, true, thickness, shape_alpha)
 
                 elseif shape_idx == 1 then
-                    -- Hexagon
                     local pts = {}
                     for i = 0, 5 do
                         local a = shape_angle + i * (pi2 / 6)
@@ -1966,7 +1980,6 @@ cheat.register("onPaint", function()
                     draw.Polyline(pts, shape_color, true, thickness, shape_alpha)
 
                 elseif shape_idx == 2 then
-                    -- Pentagon (top vertex up, flat face at bottom)
                     local pts = {}
                     for i = 0, 4 do
                         local a = shape_angle - pi * 0.5 + i * (pi2 / 5)
@@ -1977,7 +1990,6 @@ cheat.register("onPaint", function()
                     draw.Polyline(pts, shape_color, true, thickness, shape_alpha)
 
                 else
-                    -- Circle (32 segments)
                     local pts = {}
                     for i = 0, 31 do
                         local a = i * (pi2 / 32)
@@ -1992,9 +2004,9 @@ cheat.register("onPaint", function()
     end
 
     -- [Ball Trail]
-    if ui.getValue(TAB, VIS, "Ball Trail") and #trail_positions >= 2 then
-        local trail_len   = ui.getValue(TAB, VIS, "Trail Length") or 20
-        local trail_col_t = ui.getValue(TAB, VIS, "Trail Color") or {}
+    if ui.getValue(TAB2, GESP, "Ball Trail") and #trail_positions >= 2 then
+        local trail_len   = ui.getValue(TAB2, GESP, "Trail Length") or 20
+        local trail_col_t = ui.getValue(TAB2, GESP, "Trail Color") or {}
         local trail_color = picker_to_color3(trail_col_t)
         local trail_alpha = trail_col_t.a or 200
         local start_idx   = math.max(1, #trail_positions - trail_len + 1)
@@ -2012,7 +2024,7 @@ cheat.register("onPaint", function()
     end
 
     -- [Snap Line]
-    if ui.getValue(TAB, VIS, "Snap Line") then
+    if ui.getValue(TAB2, GESP, "Snap Line") then
         local ball_pos = live_ball_center
         if ball_pos then
             local sw, sh = cheat.GetWindowSize()
@@ -2036,7 +2048,7 @@ cheat.register("onPaint", function()
             if ok and bsx and bsy then
                 bsx = math.max(0, math.min(sw, bsx))
                 bsy = math.max(0, math.min(sh, bsy))
-                local snap_col_t = ui.getValue(TAB, VIS, "Snap Color") or {}
+                local snap_col_t = ui.getValue(TAB2, GESP, "Snap Color") or {}
                 local snap_color = picker_to_color3(snap_col_t)
                 local snap_alpha = snap_col_t.a or 150
                 if ol_snap then draw.Polyline({{sw * 0.5, sh}, {bsx, bsy}}, COLOR_BLACK, false, 2.5, snap_alpha) end
@@ -2046,7 +2058,7 @@ cheat.register("onPaint", function()
     end
 
     -- [Velocity Arrow]
-    if ui.getValue(TAB, VIS, "Velocity Arrow") then
+    if ui.getValue(TAB2, GESP, "Velocity Arrow") then
         local ball_pos = live_ball_center
         if ball_pos and world_ball and world_ball.Parent then
             local ok_v, vel = pcall(function() return world_ball.Velocity end)
@@ -2063,9 +2075,9 @@ cheat.register("onPaint", function()
                     local slen = math.sqrt(sdx * sdx + sdy * sdy)
                     if slen > 0.5 then
                         local nx, ny   = sdx / slen, sdy / slen
-                        local arr_len  = (ui.getValue(TAB, VIS, "Arrow Scale") or 1.0) * 50
+                        local arr_len  = (ui.getValue(TAB2, GESP, "Arrow Scale") or 1.0) * 50
                         local ex, ey   = bsx + nx * arr_len, bsy + ny * arr_len
-                        local arr_col_t = ui.getValue(TAB, VIS, "Arrow Color") or {}
+                        local arr_col_t = ui.getValue(TAB2, GESP, "Arrow Color") or {}
                         local arr_color = picker_to_color3(arr_col_t)
                         local arr_alpha = arr_col_t.a or 255
 
@@ -2091,14 +2103,13 @@ cheat.register("onPaint", function()
     end
 
     -- [Off-screen Ball Indicator]
-    if ui.getValue(TAB, VIS, "Ball Indicator") then
+    if ui.getValue(TAB2, GESP, "Ball Indicator") then
         local ball_pos = live_ball_center
         if ball_pos then
             local sw, sh   = cheat.GetWindowSize()
             local cx, cy   = sw * 0.5, sh * 0.5
             local cam_pos  = game.CameraPosition
 
-            -- 3D world direction from camera to ball (used for dot-product + fallback)
             local wx, wy, wz, wl = 0, 0, 0, 0
             local ball_in_front  = false
             if cam_pos then
@@ -2107,7 +2118,6 @@ cheat.register("onPaint", function()
                 wz = ball_pos.Z - cam_pos.Z
                 wl = math.sqrt(wx*wx + wy*wy + wz*wz)
                 if wl > 0.1 then
-                    -- Positive dot = ball is in front of camera
                     ball_in_front = (wx * cam_fwx + wz * cam_fwz) > 0
                 end
             end
@@ -2123,13 +2133,10 @@ cheat.register("onPaint", function()
                               and bsy >= pad and bsy <= sh - pad
 
             if not on_screen then
-                -- Compute screen-space direction to ball
                 local dx, dy
                 if ok and bsx and bsy and ball_in_front then
-                    -- In front but off-screen: WorldToScreen coords are valid
                     dx, dy = bsx - cx, bsy - cy
                 elseif wl > 0.1 then
-                    -- Behind camera or nil coords: project world dir onto camera axes
                     dx = (wx/wl * cam_rx + wz/wl * cam_rz) * sw
                     dy = -(wy/wl) * sh
                 end
@@ -2140,9 +2147,9 @@ cheat.register("onPaint", function()
                         local nx, ny    = dx / len, dy / len
                         local mpos      = utility.GetMousePos()
                         local mx, my    = mpos[1], mpos[2]
-                        local radius    = ui.getValue(TAB, VIS, "Indicator Radius") or 60
+                        local radius    = ui.getValue(TAB2, GESP, "Indicator Radius") or 60
                         local ex, ey    = mx + nx * radius, my + ny * radius
-                        local ind_col_t = ui.getValue(TAB, VIS, "Indicator Color") or {}
+                        local ind_col_t = ui.getValue(TAB2, GESP, "Indicator Color") or {}
                         local ind_color = picker_to_color3(ind_col_t)
                         local ind_alpha = ind_col_t.a or 255
                         local R = 8
@@ -2163,7 +2170,7 @@ cheat.register("onPaint", function()
     end
 end)
 
--- [Shutdown]
+-- ── Shutdown ──────────────────────────────────────────────────────────────
 
 cheat.register("shutdown", function()
     if ptb_phase == "stealing" then keyboard.Release("e") end
