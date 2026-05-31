@@ -32,7 +32,7 @@ Two MCP servers let Claude Code talk to the live game and API docs:
 
 | Server | What it does |
 |---|---|
-| `serotonin-mcp` | File-based IPC bridge to the running game — workspace dumps, Lua eval, instance inspection, UI read/write |
+| `serotonin` | File-based IPC bridge to the running game — workspace dumps, Lua eval, instance inspection, UI read/write |
 | `serotonin-docs` | Community-audited API reference so Claude looks up signatures instead of guessing |
 
 **Clone and build the serotonin MCP server:**
