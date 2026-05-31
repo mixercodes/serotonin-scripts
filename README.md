@@ -99,7 +99,6 @@ end)
 ```
 .globals/          Luau type stubs for luau-lsp autocomplete
 .vscode/           VS Code workspace settings
-agent.lua          Lives in mcp-serotonin-v2/lua/ — load from there directly
 .mcp.json          MCP server config for Claude Code
 CLAUDE.md          Claude Code instructions (AI workflow, conventions, gotchas)
 *.lua              Scripts

@@ -38,7 +38,7 @@ Never guess Serotonin API signatures. Before writing any API call, look it up vi
 ## Maintenance Rules
 
 CLAUDE.md is for: workflow, conventions, runtime corrections to stubs, and things no other file captures.
-CLAUDE.md is **not** for: type signatures or method lists (→ `.globals/environment.d.luau`), crasher lists (→ `crash_blacklist.json`), or generic Lua advice.
+CLAUDE.md is **not** for: type signatures or method lists (→ `.globals/environment.d.luau`), or generic Lua advice.
 Before adding anything here: check if it belongs in one of those files instead. If adding a runtime correction, update the stubs too — don't duplicate, redirect.
 
 ## Project Overview
