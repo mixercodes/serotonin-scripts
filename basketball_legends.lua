@@ -1,5 +1,5 @@
 local tab = "Basketball"
-ui.newTab(tab, "Basketball Legends")
+ui.newTab(tab, "BBL")
 
 local config_save, config_load
 
@@ -217,30 +217,34 @@ local ab_enable   = ui.newCheckbox(tab, ab_con, "Enable Auto Block")
 local ab_hotkey   = ui.newHotkey(tab, ab_con, "Block Key", true)
 local ab_show     = ui.newCheckbox(tab, ab_con, "Show Zone")
 local ab_col      = ui.newColorpicker(tab, ab_con, "Zone Color", { r = 80, g = 180, b = 255, a = 180 }, true)
-local ab_radius   = ui.newSliderFloat(tab, ab_con, "Block Radius",   1, 15)
-local ab_hold_min = ui.newSliderInt(tab,   ab_con, "Hold Min (ms)", 50, 300)
-local ab_hold_max = ui.newSliderInt(tab,   ab_con, "Hold Max (ms)", 50, 300)
+local ab_radius   = ui.newSliderFloat(tab, ab_con, "Block Radius",     1, 15)
+local ab_windup   = ui.newSliderFloat(tab, ab_con, "Wind-up Threshold", 0, 5)
+local ab_hold_min = ui.newSliderInt(tab,   ab_con, "Hold Min (ms)",    50, 300)
+local ab_hold_max = ui.newSliderInt(tab,   ab_con, "Hold Max (ms)",    50, 300)
 
-ui.setValue(tab, ab_con, "Block Radius",   7)
-ui.setValue(tab, ab_con, "Hold Min (ms)", 80)
-ui.setValue(tab, ab_con, "Hold Max (ms)", 160)
+ui.setValue(tab, ab_con, "Block Radius",      7)
+ui.setValue(tab, ab_con, "Wind-up Threshold", 1.5)
+ui.setValue(tab, ab_con, "Hold Min (ms)",    80)
+ui.setValue(tab, ab_con, "Hold Max (ms)",   160)
 
-ui.SetVisibility(tab, ab_con, "Block Key",      false)
-ui.SetVisibility(tab, ab_con, "Show Zone",      false)
-ui.SetVisibility(tab, ab_con, "Zone Color",     false)
-ui.SetVisibility(tab, ab_con, "Block Radius",   false)
-ui.SetVisibility(tab, ab_con, "Hold Min (ms)",  false)
-ui.SetVisibility(tab, ab_con, "Hold Max (ms)",  false)
+ui.SetVisibility(tab, ab_con, "Block Key",           false)
+ui.SetVisibility(tab, ab_con, "Show Zone",           false)
+ui.SetVisibility(tab, ab_con, "Zone Color",          false)
+ui.SetVisibility(tab, ab_con, "Block Radius",        false)
+ui.SetVisibility(tab, ab_con, "Wind-up Threshold",   false)
+ui.SetVisibility(tab, ab_con, "Hold Min (ms)",       false)
+ui.SetVisibility(tab, ab_con, "Hold Max (ms)",       false)
 
 cheat.register("onUpdate", function()
     local on      = ui.getValue(tab, ab_con, "Enable Auto Block")
     local show_on = on and ui.getValue(tab, ab_con, "Show Zone")
-    ui.SetVisibility(tab, ab_con, "Block Key",     on)
-    ui.SetVisibility(tab, ab_con, "Show Zone",     on)
-    ui.SetVisibility(tab, ab_con, "Zone Color",    show_on)
-    ui.SetVisibility(tab, ab_con, "Block Radius",  on)
-    ui.SetVisibility(tab, ab_con, "Hold Min (ms)", on)
-    ui.SetVisibility(tab, ab_con, "Hold Max (ms)", on)
+    ui.SetVisibility(tab, ab_con, "Block Key",          on)
+    ui.SetVisibility(tab, ab_con, "Show Zone",          on)
+    ui.SetVisibility(tab, ab_con, "Zone Color",         show_on)
+    ui.SetVisibility(tab, ab_con, "Block Radius",       on)
+    ui.SetVisibility(tab, ab_con, "Wind-up Threshold",  on)
+    ui.SetVisibility(tab, ab_con, "Hold Min (ms)",      on)
+    ui.SetVisibility(tab, ab_con, "Hold Max (ms)",      on)
 end)
 
 local ab_last_t       = 0
@@ -297,7 +301,7 @@ cheat.register("onUpdate", function()
         local dz = pos.Z - lp_pos.Z
         if dx*dx + dz*dz > r2 then goto continue end
         local ok3, delta = pcall(function() return attach.Position.Y - pos.Y end)
-        if not ok3 or delta < 1.5 then goto continue end
+        if not ok3 or delta < ui.getValue(ab_windup) then goto continue end
         -- wind-up detected: ball is raised 1.5+ units above HRP
         if ab_key_held then return end
         local now = utility.GetTickCount()
@@ -352,6 +356,7 @@ local SAVE_WIDGETS = {
     {ab_con, "Show Zone",           "val"},
     {ab_con, "Zone Color",          "val"},
     {ab_con, "Block Radius",        "val"},
+    {ab_con, "Wind-up Threshold",   "val"},
     {ab_con, "Hold Min (ms)",       "val"},
     {ab_con, "Hold Max (ms)",       "val"},
 }
