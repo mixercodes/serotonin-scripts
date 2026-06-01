@@ -124,6 +124,10 @@ Use this to pick the right tool the first time. `grep_dump` is always the search
 
 **`GetAttributes()` format in Serotonin's sandbox**: returns an array of tables, not a flat dict. Each entry is `{Name = "...", TypeName = "bool"/"int"/etc., Value = ...}`. Iterate with `pairs` and check `attr.Name` and `attr.Value`.
 
+**`draw.TextOutlined` / `draw.Text` alpha is 0–255, not 0–1.** The docs show `alpha = 1` in examples but that renders the text at 1/255 opacity — effectively invisible. Pass `255` for fully opaque. Confirmed against `blue_lock_rivals.lua` which uses `draw.TextOutlined(..., 255)` and renders correctly.
+
+**`HumanoidRootPart.CFrame` returns `nil` for non-local players** — confirmed via eval. `LookVector`, `RightVector`, and `GetComponents()` are all inaccessible. To get a player's facing direction, track their position delta across ticks: cache the last non-zero movement vector and use it as the facing direction (works even when they stop, since the last direction persists).
+
 **Gotchas verified via agent eval**:
 - `game.GetService` uses dot syntax: `game.GetService("Players")`, not `game:GetService(...)`. The Lua `game` is a sandbox proxy table, not an Instance userdata.
 - `entity.GetPlayers()` returns userdata (not indices as older docs claim). Access fields as `p.Name`, call bone methods as `p:GetBonePosition("HumanoidRootPart")`.
@@ -205,6 +209,33 @@ These behaviors have been confirmed in production scripts:
   - `ui.getHotkey(tab, container, label)` → `{key, key_name, mode}` if you need the bound key name/code.
   - Set default binding with `ui.setValue(tab, container, label, vk_code)` (Windows VK code: `0x46` = F, `0x47` = G, `0x70` = F1, letters A-Z = `0x41..0x5A`).
   - Do not use dropdown + `keyboard.IsPressed` for keybinds.
+- **When a master Enable checkbox is off, every sub-widget in its container must be hidden.** This includes the hotkey, all sliders, nested checkboxes, and colorpickers. Set their initial visibility to `false` at script load via `ui.SetVisibility`, then show them in the dedicated visibility `onUpdate` only when the master checkbox is true. Nested conditions (e.g. a sub-checkbox revealing a slider) are chained on top: `local sub_on = enabled and ui.getValue(tab, con, "Sub Feature")`. Example:
+  ```lua
+  -- at load
+  ui.SetVisibility(tab, con, "Hotkey",    false)
+  ui.SetVisibility(tab, con, "Slider",    false)
+  ui.SetVisibility(tab, con, "Sub Check", false)
+  ui.SetVisibility(tab, con, "Sub Slider",false)
+  -- visibility onUpdate
+  cheat.register("onUpdate", function()
+      local on     = ui.getValue(tab, con, "Enable")
+      local sub_on = on and ui.getValue(tab, con, "Sub Check")
+      ui.SetVisibility(tab, con, "Hotkey",     on)
+      ui.SetVisibility(tab, con, "Slider",     on)
+      ui.SetVisibility(tab, con, "Sub Check",  on)
+      ui.SetVisibility(tab, con, "Sub Slider", sub_on)
+  end)
+  ```
+- **Widget visibility must be driven by checkbox/dropdown values, never hotkey hold state.** A hotkey's `getValue` returns `true` only while the key is physically held — wiring `SetVisibility` to it causes the widget to flicker in and out every ~5ms. Use a `NewCheckbox` as the visibility gate; the hotkey (if needed) is a separate widget for triggering the action.
+- **Visibility updates belong in a dedicated `onUpdate`, separate from game logic.** One callback reads all toggle values and calls `SetVisibility`; another handles the actual feature. This matches the `blue_lock_rivals.lua` pattern and keeps the two concerns from interfering.
+- **Always use the string-triple `(tab, container, "Label")` form for `getValue` and `SetVisibility` when managing visibility.** Numeric refs work for reading widget state in game logic, but visibility management reads the same widgets from a different callback — string-triple is unambiguous and matches how BLR is written. Example:
+  ```lua
+  -- dedicated visibility callback
+  cheat.register("onUpdate", function()
+      local variance_on = ui.getValue(tab, con, "Perfect Chance")
+      ui.SetVisibility(tab, con, "Variance (ms)", variance_on)
+  end)
+  ```
 - **Containers use `next = true` for side-by-side layout**: colorpickers inline on a checkbox (`inLine=true`) still work fine, but a full-width container still feels cramped. Pair your main settings container with a secondary "Info"/"Status" container using `next = true` so the tab isn't one giant column.
 
 ## Dynamic Game Data
