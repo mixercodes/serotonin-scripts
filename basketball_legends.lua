@@ -88,7 +88,7 @@ end
 -- ============================================================
 
 local as_con = "Auto Steal"
-ui.newContainer(tab, as_con, "Auto Steal", { autosize = true })
+ui.newContainer(tab, as_con, "Auto Steal", { autosize = true, next = true })
 
 local as_enable   = ui.newCheckbox(tab, as_con, "Enable Auto Steal")
 local as_hotkey   = ui.newHotkey(tab, as_con, "Steal Key", true)
@@ -331,7 +331,7 @@ end)
 -- ============================================================
 
 local cfg_con = "Config"
-ui.newContainer(tab, cfg_con, "Config", { autosize = true })
+ui.newContainer(tab, cfg_con, "Config", { autosize = true, next = true })
 ui.NewButton(tab, cfg_con, "Save Config",   function() config_save() end)
 ui.NewButton(tab, cfg_con, "Load Config",   function() config_load() end)
 ui.NewButton(tab, cfg_con, "Delete Config", function() file.delete("bl_config.lua") end)
