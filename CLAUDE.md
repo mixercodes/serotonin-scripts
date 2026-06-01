@@ -135,7 +135,9 @@ Use this to pick the right tool the first time. `grep_dump` is always the search
 
 **`GetAttributes()` format in Serotonin's sandbox**: returns an array of tables, not a flat dict. Each entry is `{Name = "...", TypeName = "bool"/"int"/etc., Value = ...}`. Iterate with `pairs` and check `attr.Name` and `attr.Value`.
 
-**`draw.TextOutlined` / `draw.Text` alpha is 0–255, not 0–1.** The docs show `alpha = 1` in examples but that renders the text at 1/255 opacity — effectively invisible. Pass `255` for fully opaque. Confirmed against `blue_lock_rivals.lua` which uses `draw.TextOutlined(..., 255)` and renders correctly.
+**`draw.*` alpha is 0–255 at runtime — the serotonin-docs reference is wrong about this.** The docs page states *"Alpha (where supported) is a separate trailing `0..1` argument"* and shows examples with `alpha = 1`, `0.85`, `0.7`. That description does not match the runtime: the engine treats the argument as a 0–255 byte, so passing `1` renders at 1/255 opacity (effectively invisible) and passing `0.85` at under 1%. Use `255` for fully opaque, `0` for transparent, and integer values in between for partial opacity. Applies to every draw call: `Rect`, `RectFilled`, `Line`, `Text`, `TextOutlined`, `Circle`, `Polyline`, `ConvexPolyFilled`, `Gradient`, etc. Confirmed by `blue_lock_rivals.lua` using `180` and `90` for visually distinct opacity levels (both would clamp to 1.0 if the range were truly 0..1), and `localplayer_esp.lua` using `200`/`255`.
+
+**`p.IsVisible` is `false` for all players in tested games** — confirmed via eval across 12 alive players. The docs describe it as "true if not behind a wall" but it appears non-functional. Do not use it as a wall check; it will silently exclude all targets. No raycast API is exposed in Serotonin, so server-side wall checks are not possible.
 
 **`HumanoidRootPart.CFrame` returns `nil` for non-local players** — confirmed via eval. `LookVector`, `RightVector`, and `GetComponents()` are all inaccessible. To get a player's facing direction, track their position delta across ticks: cache the last non-zero movement vector and use it as the facing direction (works even when they stop, since the last direction persists).
 
@@ -144,11 +146,16 @@ Use this to pick the right tool the first time. `grep_dump` is always the search
 - `entity.GetPlayers()` returns userdata (not indices as older docs claim). Access fields as `p.Name`, call bone methods as `p:GetBonePosition("HumanoidRootPart")`.
 - `entity.GetPlayers(false)` **excludes the local player**. Use `entity.GetLocalPlayer()` to get the local player entity. `game.GetService("Players").LocalPlayer` is nil in Serotonin's sandbox — never use it.
 - `entity.Position` is often stale (stays at `(0,0,0)` in FFA modes). Use `p:GetBonePosition("HumanoidRootPart")` for the live value.
+- **Entity cache only tracks bone positions for enemies, not teammates.** `p:GetBonePosition()` returns `(0,0,0)` for non-enemy players even when they're alive and moving. `p.BoundingBox` is also empty for teammates. Fall back to workspace for teammate positions: `game.Workspace:FindFirstChild(p.Name):FindFirstChild("HumanoidRootPart").Position`. Confirmed via eval: all 4 teammates had `hrp_zero=true` from entity but valid positions from workspace.
 - **R15 vs R6 bones**: R15 characters use `UpperTorso`/`LowerTorso`/`LeftUpperArm` etc. instead of `Torso`/`Left Arm` etc. The `get_bones` MCP tool auto-detects rig type by checking for `UpperTorso` in the character. When writing ESP manually, do the same check.
-- **`GetBonePosition` returns `Vector3(0,0,0)` for bones that don't exist** in the rig — not nil. Filter out zero-position bones before drawing.
+- **`GetBonePosition` can return nil** — despite docs stating it returns `Vector3(0,0,0)` for missing bones, it has been observed returning nil in production (confirmed: caused `attempt to index local 'b' (a nil value)` on line accessing `.X`). Always guard with `if not b then` before indexing. Zero-vector check is still needed separately for bones that exist but have no valid position.
 - Valid `memory.Read` / `memory.Write` types: see `MemoryType` in `.globals/environment.d.luau`.
 - **Agent observations are only valid for the current game state.** Never draw conclusions from data collected outside the game state being debugged — instance structure and value semantics can differ significantly between states.
 - **Always verify the Lua `type()` of a value before writing comparisons against it.** A `BoolValue.Value` may be exposed as a number in Serotonin's sandbox — `op.Value == true` silently fails if the value is numeric.
+- **`_G` is nil in Serotonin's sandbox** — use bare globals directly: `_ESP_LOADED = true`, not `_G._ESP_LOADED = true`. The `_G` table does not exist.
+- **`cheat.register` cannot be called from inside `pcall`** — raises `"Cannot register callback outside of a script's main execution block."` When executing a script via `eval`+`loadstring`, call `fn()` directly, not `pcall(fn)`.
+- **`file.read` sandbox root is `files/`, not `scripts/`** — scripts live in `C:/Serotonin/scripts/` which is outside the sandbox. Use absolute paths: `file.read("C:/Serotonin/scripts/myscript.lua")`.
+- **No `cheat.Unregister` — to "unload" via eval, set Enable to false and clear the guard flag.** Callbacks cannot be removed once registered. The practical pattern: `ui.setValue(TAB, CON, "Enable", false); _SCRIPT_LOADED = nil` — callbacks still fire but return immediately, and the script can be re-run fresh.
 
 ## Documentation
 
@@ -204,7 +211,7 @@ These behaviors have been confirmed in production scripts:
 - `ui.newDropdown` 5th arg (default) is also **0-based**. All three (getValue, setValue, 5th arg default) are consistently 0-based. (Previously documented as 1-based — confirmed incorrect via live test; 1-based conversion broke dropdown logic in production.)
 - `ui.setValue` works at top-level after widget creation for setting defaults. For sliders, when the type stub flags the 6th arg (default) of `newSliderFloat` as a mismatch, omit the 6th arg and set the default via `ui.setValue` instead — runtime accepts it either way.
 - `loadstring(str)()` works for dynamic code execution
-- `ui.NewColorpicker(... inLine=true)` attaches to the **immediately preceding widget in declaration order** — declare each colorpicker directly after its paired widget, not at the end of the block
+- **`ui.NewColorpicker` full signature is `(tab, container, label, defaultColor, inLine)`** — the 4th arg is the default color as `{r=, g=, b=, a=}` and the 5th arg is `true` for inline. Confirmed in `blue_lock_rivals.lua` and `localplayer_esp.lua`: `ui.NewColorpicker(TAB, CON, "Box Color", {r=255, g=80, b=80, a=255}, true)`. Passing only 3 args creates the picker without a default or inline. Passing `{inLine=true}` or bare `true` as the 4th arg does NOT produce inline — the correct form puts the default color 4th and `true` 5th. Attaches inline to the **immediately preceding widget in declaration order** — declare each colorpicker directly after its paired widget, not at the end of the block.
 - **Checkbox + colorpicker pairs are lumped**: any checkbox (or dropdown) that gates a visual element is immediately followed by its colorpicker with `inLine=true`. This is the standard layout across Serotonin scripts and is how users expect the UI to read — do not group all pickers at the bottom.
 - **Multiple colorpickers can be chained inline**: you can place as many `inLine=true` colorpickers in a row as needed — each attaches inline after the previous widget. Use this when a feature naturally has multiple related colors (e.g. a gradient's high and low colors both sit under their parent checkbox). Group pickers by what they control, not by widget type.
 - **Each checkbox owns its colorpicker**: a checkbox that has an associated color is declared as `{checkbox} {colorpicker inline}`, and any sub-checkbox (e.g. a fill toggle) follows as `{sub-checkbox} {its own colorpicker inline}`. The inline colorpicker's visibility always matches its own checkbox's visibility — never gated further on whether the checkbox is checked. Other controls (sliders, dropdowns, text toggles) come after the color-bearing rows.
@@ -250,6 +257,17 @@ These behaviors have been confirmed in production scripts:
       ui.SetVisibility(tab, con, "Variance (ms)", variance_on)
   end)
   ```
+- **Tab and container IDs must be opaque keys, never the same as their display labels.** `ui.newTab(id, label)` and `ui.newContainer(tab, id, label, opts)` take a separate internal ID and a display label. Using the same string for both causes the Serotonin UI to render the tab twice. Use a short script-prefixed key as the ID and pass the human-readable name as the label:
+  ```lua
+  local TAB  = "myscript_tab"
+  local CON  = "myscript_main"
+  local CON2 = "myscript_info"
+
+  ui.newTab(TAB, "My Script")
+  ui.newContainer(TAB, CON,  "Settings", {autosize = true})
+  ui.newContainer(TAB, CON2, "Info",     {autosize = true, next = true})
+  ```
+  This is the primary pattern used across all scripts. IDs are stable internal handles; labels are what the user sees.
 - **Containers use `next = true` for side-by-side layout**: colorpickers inline on a checkbox (`inLine=true`) still work fine, but a full-width container still feels cramped. Pair your main settings container with a secondary "Info"/"Status" container using `next = true` so the tab isn't one giant column.
 - **`autosize = true` sizes the container to fit its contents.** Pass it in the options table: `ui.newContainer(tab, con, "Label", { autosize = true })`. Combine with `next = true` for a side-by-side autosize layout: `{ autosize = true, next = true }`.
 
@@ -299,3 +317,5 @@ Never wait for the user to provide a tween implementation — the above pattern 
 - Chunked iteration for large instance scans (process N per frame, not all at once)
 - Accumulator patterns for sub-pixel mouse movement
 - Store `instance.Address` as a stable unique identifier for tracking
+- **One workspace lookup per player per frame, not per operation.** `game.Workspace:FindFirstChild(name)` inside `onPaint` is cheap in isolation but becomes a significant frame-time sink when called per-bone in a skeleton loop across many players (e.g. 10 bones × 2 per pair × 16 players × 60fps). Look up the character once at the top of the player loop and pass it to all helpers that need it. Enemies can skip the lookup entirely since the entity cache covers them — only non-enemies need the workspace path.
+- **Entity cache covers enemies; workspace covers teammates.** For any feature that must handle both, the fast path is: try entity first (`p:GetBonePosition`, `p.BoundingBox`), fall back to workspace only when entity returns a zero-vector or empty table. Gate the workspace lookup on `not p.IsEnemy` so enemies never pay the cost.
