@@ -38,7 +38,7 @@ Never guess Serotonin API signatures. Before writing any API call, look it up vi
 ## Maintenance Rules
 
 CLAUDE.md is for: workflow, conventions, runtime corrections to stubs, and things no other file captures.
-CLAUDE.md is **not** for: type signatures or method lists (→ `.globals/environment.d.luau`), or generic Lua advice.
+CLAUDE.md is **not** for: type signatures or method lists (→ `.globals/environment.d.luau`), generic Lua advice, or **game-specific content** (instance names, item names, game mechanics from a specific Roblox game). Game-specific observations belong in comments in the relevant script, not here.
 Before adding anything here: check if it belongs in one of those files instead. If adding a runtime correction, update the stubs too — don't duplicate, redirect.
 
 ## Project Overview
@@ -127,7 +127,7 @@ Use this to pick the right tool the first time. `grep_dump` is always the search
 | **Properties of one known instance** | `inspect` with the full Lua path (e.g. `game.Workspace.Game.Ball`) |
 | **Top-level children of a service** | `inspect_service` (e.g. Players, ReplicatedStorage) |
 | **All instances of a type** | `find_by_class` — faster than a full dump when you just need one ClassName |
-| **Whether a player has the ball** | `eval` → check `char:FindFirstChild("Basketball")` (a `Tool` named `Basketball` appears in the character when they hold it) |
+| **Whether a player holds an item** | `eval` → `char:FindFirstChildOfClass("Tool")` — tools appear as children of the character when held |
 | **Bone positions / ESP data for a player** | `get_bones` — auto-detects R15 vs R6, works on local player too |
 | **Screen dimensions or camera position** | `screen_info` |
 
