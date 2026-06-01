@@ -80,7 +80,7 @@ claude
 In Serotonin's Scripting tab, use **Load** to run a `.lua` file directly from disk, or fetch from the raw GitHub URL:
 
 ```lua
-http.Get("https://raw.githubusercontent.com/mixercodes/serotonin-scripts/master/blue_lock_rivals.lua", {}, function(body)
+http.Get("https://raw.githubusercontent.com/mixercodes/serotonin-scripts/master/<script-name>.lua", {}, function(body)
     loadstring(body)()
 end)
 ```
