@@ -99,7 +99,13 @@ The `serotonin` MCP server at `C:/Serotonin/mcp-serotonin-v2/` exposes **live** 
 | `read_dump` | Page through a dump file by line offset |
 | `grep_dump` | Regex-search a dump for instance names, classes, or value flags |
 | `inspect` | Properties + children of a specific instance by Lua path |
-| `players` | Player list with live positions from `entity.GetPlayers` |
+| `inspect_service` | Top-level children of a Roblox service (Players, ReplicatedStorage, etc.) |
+| `find_by_class` | Find all instances of a given ClassName within a root (capped at 100) |
+| `players` | Player list with live positions; includes local player (`is_local: true`) |
+| `get_bones` | R6/R15 bone positions + screen projections for a specific player; auto-detects rig type; works on local player too |
+| `screen_info` | Window dimensions, camera world position, mouse position |
+| `world_to_screen` | Project a world-space Vector3 to screen coordinates |
+| `get_attributes` | All attributes on a specific instance by Lua path (invisible to dumps) |
 | `get_ui` / `set_ui` | Read or write a Serotonin UI widget value |
 
 **When to use it**: before writing anything mode-specific (ESP, aimbot, entity queries), run `dump_workspace` then `grep_dump` to confirm the instance layout. When a user reports "the script doesn't see X", use `inspect` or `grep_dump` to find it in the live tree.
@@ -114,11 +120,16 @@ Use this to pick the right tool the first time. `grep_dump` is always the search
 
 | Looking for… | Do this |
 |---|---|
-| **Player action/state flags** (is X stealing, blocking, guarding, etc.) | `eval` → `char:GetAttributes()` on one player's character. Attributes are the standard carrier for per-player boolean state in Roblox games. |
+| **Player action/state flags** (is X stealing, blocking, guarding, etc.) | `get_attributes` on the character (`game.Workspace:FindFirstChild(name)`) and on the Player object in the Players service. Also check the `Humanoid` and `HumanoidRootPart` for attributes. Attributes are the standard carrier for per-player boolean state and are invisible to dumps. |
+| **Local player's flags** | `get_attributes` on `game.Workspace:FindFirstChild(entity.GetLocalPlayer().Name)` |
 | **Instance names / tree structure** in Workspace | `dump_workspace` → `grep_dump` with a keyword regex |
 | **Something inside a specific large service** (ReplicatedStorage, ServerStorage, etc.) | `dump_subtree` on that service → `grep_dump`. **Never use `eval` with recursive Lua to scan a service** — it produces output too large to process. |
 | **Properties of one known instance** | `inspect` with the full Lua path (e.g. `game.Workspace.Game.Ball`) |
+| **Top-level children of a service** | `inspect_service` (e.g. Players, ReplicatedStorage) |
+| **All instances of a type** | `find_by_class` — faster than a full dump when you just need one ClassName |
 | **Whether a player has the ball** | `eval` → check `char:FindFirstChild("Basketball")` (a `Tool` named `Basketball` appears in the character when they hold it) |
+| **Bone positions / ESP data for a player** | `get_bones` — auto-detects R15 vs R6, works on local player too |
+| **Screen dimensions or camera position** | `screen_info` |
 
 **Attributes are invisible to dumps.** `grep_dump` only sees instance names and classes — it cannot find data stored as instance attributes. If you grep a dump and find nothing, check `GetAttributes()` on the relevant instance via `eval` before concluding the data isn't there.
 
@@ -131,7 +142,10 @@ Use this to pick the right tool the first time. `grep_dump` is always the search
 **Gotchas verified via agent eval**:
 - `game.GetService` uses dot syntax: `game.GetService("Players")`, not `game:GetService(...)`. The Lua `game` is a sandbox proxy table, not an Instance userdata.
 - `entity.GetPlayers()` returns userdata (not indices as older docs claim). Access fields as `p.Name`, call bone methods as `p:GetBonePosition("HumanoidRootPart")`.
+- `entity.GetPlayers(false)` **excludes the local player**. Use `entity.GetLocalPlayer()` to get the local player entity. `game.GetService("Players").LocalPlayer` is nil in Serotonin's sandbox — never use it.
 - `entity.Position` is often stale (stays at `(0,0,0)` in FFA modes). Use `p:GetBonePosition("HumanoidRootPart")` for the live value.
+- **R15 vs R6 bones**: R15 characters use `UpperTorso`/`LowerTorso`/`LeftUpperArm` etc. instead of `Torso`/`Left Arm` etc. The `get_bones` MCP tool auto-detects rig type by checking for `UpperTorso` in the character. When writing ESP manually, do the same check.
+- **`GetBonePosition` returns `Vector3(0,0,0)` for bones that don't exist** in the rig — not nil. Filter out zero-position bones before drawing.
 - Valid `memory.Read` / `memory.Write` types: see `MemoryType` in `.globals/environment.d.luau`.
 - **Agent observations are only valid for the current game state.** Never draw conclusions from data collected outside the game state being debugged — instance structure and value semantics can differ significantly between states.
 - **Always verify the Lua `type()` of a value before writing comparisons against it.** A `BoolValue.Value` may be exposed as a number in Serotonin's sandbox — `op.Value == true` silently fails if the value is numeric.
@@ -266,7 +280,7 @@ Never wait for the user to provide a tween implementation — the above pattern 
 
 ## Best Practices
 
-- Nil-check before accessing nested properties (`game.LocalPlayer`, `.Character`, `:FindFirstChild()`)
+- Nil-check before accessing nested properties (`.Character`, `:FindFirstChild()`)
 - `entity.GetPlayers(true)` for enemies only
 - Register `shutdown` callback for cleanup (`entity.ClearModels()`, etc.)
 - Check `onScreen` boolean from `utility.WorldToScreen()` before drawing
