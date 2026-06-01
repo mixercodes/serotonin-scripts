@@ -14,9 +14,11 @@ Personal scripts for the [Serotonin](https://serotonin.win/) Lua scripting API, 
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/mixercodes/serotonin-scripts.git
-cd serotonin-scripts
+git clone https://github.com/mixercodes/serotonin-scripts.git C:/Serotonin/scripts
+cd C:/Serotonin/scripts
 ```
+
+> The repo must live at `C:\Serotonin\scripts` — the MCP server and `CLAUDE.md` paths depend on it.
 
 ### 2. Open in VS Code
 
