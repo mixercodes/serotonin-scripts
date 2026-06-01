@@ -237,6 +237,7 @@ These behaviors have been confirmed in production scripts:
   end)
   ```
 - **Containers use `next = true` for side-by-side layout**: colorpickers inline on a checkbox (`inLine=true`) still work fine, but a full-width container still feels cramped. Pair your main settings container with a secondary "Info"/"Status" container using `next = true` so the tab isn't one giant column.
+- **`autosize = true` sizes the container to fit its contents.** Pass it in the options table: `ui.newContainer(tab, con, "Label", { autosize = true })`. Combine with `next = true` for a side-by-side autosize layout: `{ autosize = true, next = true }`.
 
 ## Dynamic Game Data
 
