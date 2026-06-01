@@ -1,0 +1,27 @@
+[ TAB 1: Basketball Legends ]
+
+[ + ] Perfect Shot
+- Enable (hotkey)
+- Hold Duration (ms)
+- Perfect Chance toggle
+  - Variance (ms)
+
+[ + ] Auto Steal
+- Enable Auto Steal (hotkey)
+- Show Zone (color)
+- Steal Radius
+- Hold Min / Max (ms)
+- Triggers: any player in radius holding the Basketball tool
+
+[ + ] Auto Block
+- Enable Auto Block (hotkey — must be held to activate)
+- Show Zone (color)
+- Block Radius
+- Hold Min / Max (ms)
+- Triggers: any player in radius raises ball 1.5+ units above HRP (wind-up detection)
+  - Presses Space at wind-up, not on ball release
+
+[ + ] Config
+- Save Config
+- Load Config
+- Delete Config
