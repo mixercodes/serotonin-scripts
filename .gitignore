@@ -1,3 +1,7 @@
+# Only .lua files belong here — everything else is dev tooling
+.globals/
+.vscode/
+.mcp.json
+CLAUDE.md
 *_loadstring.lua
-pixel_cat_pet.lua
 agent.lua

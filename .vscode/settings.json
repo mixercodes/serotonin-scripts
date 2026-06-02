@@ -1,7 +1,0 @@
-{
-  "luau-lsp.types.definitionFiles": [
-    "./.globals/environment.d.luau",
-  ],
-  "luau-lsp.sourcemap.enabled": false,
-  "luau-lsp.completion.autocompleteEnd": true,
-}
