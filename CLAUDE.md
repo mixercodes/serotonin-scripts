@@ -33,7 +33,7 @@ Claude will pick up CLAUDE.md automatically. For live game queries, make sure Se
 
 ## No Guessing API Syntax
 
-Never guess Serotonin API signatures. Before writing any API call, look it up via `mcp__serotonin-ref__get_function` or `mcp__serotonin-ref__search_pages`. Serotonin's API regularly differs from Roblox executor conventions, standard Lua, and other scripting platforms.
+Never guess Serotonin API signatures. Before writing any API call, look it up via the `serotonin-ref` MCP — use `list_functions` to discover what a library offers, then `lookup` to pull the exact signature. Serotonin's API regularly differs from Roblox executor conventions, standard Lua, and other scripting platforms.
 
 ## Maintenance Rules
 
@@ -165,10 +165,14 @@ Use the `serotonin-ref` MCP tools for API questions:
 
 | Tool | Use when |
 |---|---|
-| `mcp__serotonin-ref__list_pages` | Browse what libraries / pages exist |
-| `mcp__serotonin-ref__read_page` | Pull a full page (e.g. `entity`, `draw`, `ui`) |
-| `mcp__serotonin-ref__search_pages` | Keyword search across the whole reference |
-| `mcp__serotonin-ref__get_function` | Resolve a specific function to its signature and examples |
+| `mcp__serotonin-ref__list_functions` | Explore what functions a library has before looking anything up — start here |
+| `mcp__serotonin-ref__lookup` | Pull one function by dotted name while writing code (`draw.Text`, `entity.GetPlayers`) |
+| `mcp__serotonin-ref__get_function` | Same as lookup with separate `library`/`name` params |
+| `mcp__serotonin-ref__search_pages` | Keyword search when you don't know which library a concept lives in |
+| `mcp__serotonin-ref__read_page` | Pull a full page — only when you need all prose and examples |
+| `mcp__serotonin-ref__list_pages` | Browse the full page inventory |
+
+**Preferred workflow:** `list_functions(library)` → `lookup(library.Function)`. Avoid `read_page` unless you need the full prose — it's much larger than a `lookup` result.
 
 **Resolution order for API questions:** `serotonin-ref` MCP → `.globals/environment.d.luau` (type stubs, least reliable). Where these disagree with observed runtime behavior, runtime wins.
 
