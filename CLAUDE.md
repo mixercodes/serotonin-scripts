@@ -12,10 +12,10 @@ Loaded automatically by Claude Code on every session. Contains workflow rules, r
 **2. MCP servers**
 Two MCP servers extend Claude's capabilities beyond file editing:
 
-- `serotonin-docs` - serves the community-audited Serotonin API reference (17 libraries, 130 functions, crash flags). Claude queries this before writing any API call instead of guessing.
-- `serotonin` - file-based IPC bridge to the live running Roblox game via `agent.lua`. Lets Claude dump the instance tree, run lightweight Lua, inspect instances, read/write UI values, and verify game state while writing scripts. No WebSocket — crash-safe by design.
+- `serotonin-ref` - serves the Serotonin API reference (17 libraries, 130 functions, runtime-verified). Claude queries this before writing any API call instead of guessing. Hosted HTTP MCP at `https://serotonin-ref.vercel.app/api/mcp`.
+- `serotonin` - file-based IPC bridge to the live running Roblox game via `agent.lua`. Lets Claude dump the instance tree, run lightweight Lua, inspect instances, read/write UI values, and verify game state while writing scripts. File-based IPC — no HTTP overhead.
 
-The `serotonin` server is at [mixercodes/mcp-serotonin-v2](https://github.com/mixercodes/mcp-serotonin-v2). The `serotonin-docs` server is published as `mcp-serotonin-docs` on npm.
+The `serotonin` server is at [mixercodes/mcp-serotonin-v2](https://github.com/mixercodes/mcp-serotonin-v2). The `serotonin-ref` server is hosted at `https://serotonin-ref.vercel.app/api/mcp` — no local install needed.
 
 MCP config lives in `.mcp.json` at the repo root. To use the agent, load `C:/Serotonin/mcp-serotonin-v2/lua/agent.lua` directly from the MCP repo in Serotonin before starting a Claude session.
 
@@ -33,7 +33,7 @@ Claude will pick up CLAUDE.md automatically. For live game queries, make sure Se
 
 ## No Guessing API Syntax
 
-Never guess Serotonin API signatures. Before writing any API call, look it up via `mcp__serotonin-docs__get_function` or `mcp__serotonin-docs__search_pages`. Serotonin's API regularly differs from Roblox executor conventions, standard Lua, and other scripting platforms.
+Never guess Serotonin API signatures. Before writing any API call, look it up via `mcp__serotonin-ref__get_function` or `mcp__serotonin-ref__search_pages`. Serotonin's API regularly differs from Roblox executor conventions, standard Lua, and other scripting platforms.
 
 ## Maintenance Rules
 
@@ -110,7 +110,7 @@ The `serotonin` MCP server at `C:/Serotonin/mcp-serotonin-v2/` exposes **live** 
 
 **When to use it**: before writing anything mode-specific (ESP, aimbot, entity queries), run `dump_workspace` then `grep_dump` to confirm the instance layout. When a user reports "the script doesn't see X", use `inspect` or `grep_dump` to find it in the live tree.
 
-**When *not* to use it**: API reference questions. The agent doesn't know Serotonin's Lua API shape — use the `serotonin-docs` MCP for that.
+**When *not* to use it**: API reference questions. The agent doesn't know Serotonin's Lua API shape — use the `serotonin-ref` MCP for that.
 
 **`eval` is for lightweight queries only.** Do not use it for heavy recursive work — use `dump_workspace` for tree traversal. Simple expressions like `return game.PlaceId` or `return entity.GetPlayers(true)` are fine.
 
@@ -137,7 +137,7 @@ Use this to pick the right tool the first time. `grep_dump` is always the search
 
 **`draw.*` alpha is 0–255 at runtime — the serotonin-docs reference is wrong about this.** The docs page states *"Alpha (where supported) is a separate trailing `0..1` argument"* and shows examples with `alpha = 1`, `0.85`, `0.7`. That description does not match the runtime: the engine treats the argument as a 0–255 byte, so passing `1` renders at 1/255 opacity (effectively invisible) and passing `0.85` at under 1%. Use `255` for fully opaque, `0` for transparent, and integer values in between for partial opacity. Applies to every draw call: `Rect`, `RectFilled`, `Line`, `Text`, `TextOutlined`, `Circle`, `Polyline`, `ConvexPolyFilled`, `Gradient`, etc. Confirmed by `blue_lock_rivals.lua` using `180` and `90` for visually distinct opacity levels (both would clamp to 1.0 if the range were truly 0..1), and `localplayer_esp.lua` using `200`/`255`.
 
-**`p.IsVisible` is `false` for all players in tested games** — confirmed via eval across 12 alive players. The docs describe it as "true if not behind a wall" but it appears non-functional. Do not use it as a wall check; it will silently exclude all targets. No raycast API is exposed in Serotonin, so server-side wall checks are not possible.
+**`p.IsVisible` requires a Visible Only check active in Serotonin** — with none enabled (ESP, Aimbot, or Triggerbot), returns `false` for all players. Enable at least one Visible Only check for valid wall-check results.
 
 **`HumanoidRootPart.CFrame` returns `nil` for non-local players** — confirmed via eval. `LookVector`, `RightVector`, and `GetComponents()` are all inaccessible. To get a player's facing direction, track their position delta across ticks: cache the last non-zero movement vector and use it as the facing direction (works even when they stop, since the last direction persists).
 
@@ -159,20 +159,18 @@ Use this to pick the right tool the first time. `grep_dump` is always the search
 
 ## Documentation
 
-**Primary reference: deftsolutions community-audited docs (MCP `serotonin-docs`).** The official Serotonin gitbook (`serotonin-1.gitbook.io`) has drifted — whole libraries missing, signatures wrong, crashers unflagged. The community reference at https://deftsolutions-dev.github.io/serotonin-api-docs/ is hand-audited against a live runtime (build `2e6461290a3541f5`): 17 libraries, 130 canonical functions, 282 aliases, every snippet pcall-probed. Crashers (e.g. `audio.PlaySound` non-WAV, `cheat.LoadString`, undocumented LocalPlayer fields) are flagged inline.
+**Primary reference: serotonin-ref (MCP `serotonin-ref`).** The official Serotonin gitbook (`serotonin-1.gitbook.io`) has drifted from the runtime — use it as a fallback only. The reference at https://serotonin-ref.vercel.app is runtime-verified: 17 libraries, 130 functions, crashers flagged inline.
 
-Use the `serotonin-docs` MCP tools for API questions:
+Use the `serotonin-ref` MCP tools for API questions:
 
 | Tool | Use when |
 |---|---|
-| `mcp__serotonin-docs__list_pages` | Browse what libraries / pages exist |
-| `mcp__serotonin-docs__read_page` | Pull a full page (e.g. `entity`, `draw`, `ui`) |
-| `mcp__serotonin-docs__search_pages` | Keyword search across the whole reference |
-| `mcp__serotonin-docs__get_function` | Resolve a specific function (canonical or alias) to its signature, examples, and crash flags |
+| `mcp__serotonin-ref__list_pages` | Browse what libraries / pages exist |
+| `mcp__serotonin-ref__read_page` | Pull a full page (e.g. `entity`, `draw`, `ui`) |
+| `mcp__serotonin-ref__search_pages` | Keyword search across the whole reference |
+| `mcp__serotonin-ref__get_function` | Resolve a specific function to its signature and examples |
 
-For LLM context bundling: the full reference is also available as a single blob at https://deftsolutions-dev.github.io/serotonin-api-docs/llms-full.md.
-
-**Resolution order for API questions:** `serotonin-docs` MCP → `.globals/environment.d.luau` (type stubs, least reliable for runtime). Where these disagree with observed runtime behavior, runtime wins.
+**Resolution order for API questions:** `serotonin-ref` MCP → `.globals/environment.d.luau` (type stubs, least reliable). Where these disagree with observed runtime behavior, runtime wins.
 
 **Docs before agent — always.** When wondering whether a Serotonin API feature exists (a utility function, a file method, a draw call, anything), search `serotonin-docs` first. Do not reach for the `eval` tool to probe what's available — the agent doesn't know Serotonin's Lua API shape and probing it is slow and unreliable for capability discovery. Only use the agent to verify *runtime behavior* of something the docs already describe, or to inspect live game state. Example failure mode: spending multiple eval round-trips discovering `os.date`/`DateTime` are unavailable, when `utility.GetSystemTime()` and `utility.GetTimestamp()` were in the docs the whole time.
 

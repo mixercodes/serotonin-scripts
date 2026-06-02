@@ -4,9 +4,9 @@
       "command": "node",
       "args": ["C:\\Serotonin\\mcp-serotonin-v2\\dist\\index.js"]
     },
-    "serotonin-docs": {
-      "command": "npx",
-      "args": ["-y", "mcp-serotonin-docs"]
+    "serotonin-ref": {
+      "type": "http",
+      "url": "https://serotonin-ref.vercel.app/api/mcp"
     }
   }
 }

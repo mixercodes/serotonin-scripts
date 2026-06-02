@@ -35,7 +35,7 @@ Two MCP servers let Claude Code talk to the live game and API docs:
 | Server | What it does |
 |---|---|
 | `serotonin` | File-based IPC bridge to the running game — workspace dumps, Lua eval, instance inspection, UI read/write |
-| `serotonin-docs` | Community-audited API reference so Claude looks up signatures instead of guessing |
+| `serotonin-ref` | Hosted HTTP MCP serving the runtime-verified API reference — no local install needed |
 
 **Clone and build the serotonin MCP server:**
 
@@ -55,9 +55,9 @@ npm run build
       "command": "node",
       "args": ["C:/Serotonin/mcp-serotonin-v2/dist/index.js"]
     },
-    "serotonin-docs": {
-      "command": "npx",
-      "args": ["-y", "mcp-serotonin-docs"]
+    "serotonin-ref": {
+      "type": "http",
+      "url": "https://serotonin-ref.vercel.app/api/mcp"
     }
   }
 }
@@ -91,7 +91,7 @@ end)
 
 ## API reference
 
-- **Community docs (preferred)**: https://deftsolutions-dev.github.io/serotonin-api-docs/ — hand-audited against a live runtime, correct signatures and crash flags for all 17 libraries.
+- **Serotonin API reference**: https://serotonin-ref.vercel.app — runtime-verified, 17 libraries, 130 functions, crashers flagged inline.
 - **Official gitbook**: https://serotonin-1.gitbook.io — use as fallback only, known to have drifted from the actual runtime.
 
 ---
