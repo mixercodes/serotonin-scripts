@@ -10,4 +10,4 @@ end)
 
 ## API reference
 
-- https://serotonin-ref.vercel.app — runtime-verified, 17 libraries, 130+ functions
+- https://serotonin-ref.vercel.app — runtime-verified, 14 libraries + 5 userdata types
