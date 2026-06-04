@@ -6,4 +6,4 @@ Scripts are written for the [Serotonin](https://serotonin.win/) Lua scripting AP
 
 ## API reference
 
-- https://serotonin-ref.vercel.app — runtime-verified, 14 libraries + 5 userdata types
+- https://serotonin-ref.vercel.app — runtime-verified Serotonin API reference
