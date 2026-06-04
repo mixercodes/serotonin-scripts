@@ -2,6 +2,7 @@
 .globals/
 .vscode/
 .mcp.json
+.claude/
 CLAUDE.md
 *_loadstring.lua
 agent.lua
