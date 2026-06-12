@@ -73,7 +73,7 @@ Serotonin (stream.lua)  ──writes──>  C:/Serotonin/files/stream/
 | Mode | Behaviour |
 |---|---|
 | **Locked** (default) | Follows the local player from behind+above; yaw tracks the character's facing from the HumanoidRootPart's rotation matrix (`GetBoneRotation`) — sway-free, since animations never rotate the HRP — with skeleton-derived and movement-delta fallbacks. Scroll = zoom, drag = tilt/orbit. Occluders between camera and player fade out. |
-| **Freecam** | RMB = look, LMB = pan, WASD = move, Q/E = down/up, scroll = dolly. Hold Shift to move faster. |
+| **Freecam** | RMB = look, WASD = move, Q/E = down/up, scroll = dolly. Hold Shift to move faster. |
 
 Press **F** to toggle.
 
