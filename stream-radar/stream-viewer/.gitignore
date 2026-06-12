@@ -1,0 +1,5 @@
+node_modules/
+electron*.log
+package-lock.json
+mesh-cache/
+texture-cache/

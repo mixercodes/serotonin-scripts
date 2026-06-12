@@ -1,0 +1,16 @@
+{
+  "name": "serotonin-stream-radar",
+  "version": "1.0.0",
+  "description": "3D web radar viewer for Serotonin's stream.lua — renders live map geometry and player skeletons over file IPC.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "mesh": "electron mesh-viewer-main.js"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  }
+}

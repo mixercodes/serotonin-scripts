@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Serotonin Radar</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* monochrome defaults — every UI colour is a theme token, editable in the Theme section */
+    :root {
+      --bg:#14171c; --panel:#1b1f27; --border:#2c333d;
+      --text:#d8dce2; --text-dim:#828a96; --accent:#c6ccd6;
+      --ok:#cdd3dd; --warn:#9aa0aa; --bad:#6b7079;
+    }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
+    #app { width: 100vw; height: 100vh; display: block; }
+
+    #hud {
+      position: fixed; top: 12px; left: 12px;
+      font: 12px/1.5 'Consolas', 'Segoe UI', monospace;
+      color: var(--text); pointer-events: none; user-select: none;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+    #hud .title { font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: 0.5px; }
+    #hud .row { margin-top: 2px; }
+    #hud .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; transition: background .3s; }
+    #hud .on  { background: var(--ok); }
+    #hud .load{ background: var(--warn); }
+    #hud .off { background: var(--bad); }
+    #hud .key, #help .key { display:inline-block; padding:0 4px; border:1px solid var(--border); border-radius:3px; color:var(--text); font-size:10px; }
+    #legend { position: fixed; bottom: 12px; left: 12px; font: 11px/1.6 'Consolas', monospace; color: var(--text-dim); pointer-events: none; }
+    #legend .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align: middle; }
+    #help { position: fixed; bottom: 12px; right: 14px; font: 11px/1.6 'Consolas', monospace; color: var(--text-dim); pointer-events: none; text-align: right; }
+    #help b { color: var(--text); }
+
+    /* ---- settings ---- */
+    #gear {
+      position: fixed; top: 12px; right: 14px; width: 34px; height: 34px; z-index: 20;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); cursor: pointer; font-size: 17px; user-select: none;
+      transition: transform .35s cubic-bezier(.22,1,.36,1), border-color .2s;
+    }
+    #gear:hover { border-color: var(--accent); transform: rotate(35deg); }
+    #gear.open { transform: rotate(90deg); border-color: var(--accent); }
+
+    #settings {
+      position: fixed; top: 0; right: 0; height: 100%; width: 318px; z-index: 19;
+      background: var(--panel); backdrop-filter: blur(12px);
+      border-left: 1px solid var(--border); box-shadow: -10px 0 36px rgba(0,0,0,0.45);
+      transform: translateX(100%); transition: transform .4s cubic-bezier(.22,1,.36,1);
+      padding: 58px 20px 28px; overflow-y: auto;
+      font: 12px/1.5 'Consolas','Segoe UI',monospace; color: var(--text);
+    }
+    #settings.open { transform: translateX(0); }
+    /* themed scrollbars */
+    #settings::-webkit-scrollbar, .dd-menu::-webkit-scrollbar { width: 8px; height: 8px; }
+    #settings::-webkit-scrollbar-track, .dd-menu::-webkit-scrollbar-track { background: transparent; }
+    #settings::-webkit-scrollbar-thumb, .dd-menu::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    #settings::-webkit-scrollbar-thumb:hover, .dd-menu::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+    #settings h2 { font-size: 13px; letter-spacing: 1px; color: var(--text); margin-bottom: 18px; font-weight:600; }
+    #settings .section { margin-bottom: 20px; }
+    #settings .section > .title { color: var(--text-dim); text-transform: uppercase; font-size:10px; letter-spacing:1px; margin-bottom:6px; }
+    #settings .row { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height: 28px; }
+    #settings .row > label { color: var(--text); }
+    #settings .val { color: var(--text-dim); min-width:36px; text-align:right; font-variant-numeric: tabular-nums; }
+
+    .toggle { position: relative; display:inline-block; width: 38px; height: 20px; cursor:pointer; flex:none; }
+    .toggle input { display:none; }
+    .toggle .track { position:absolute; inset:0; background: var(--border); border-radius:20px; transition: background .25s; }
+    .toggle .knob { position:absolute; top:2px; left:2px; width:16px; height:16px; background: var(--text); border-radius:50%;
+      transition: transform .28s cubic-bezier(.22,1,.36,1), background .25s; }
+    .toggle input:checked + .track { background: var(--accent); }
+    .toggle input:checked + .track .knob { transform: translateX(18px); }
+
+    input[type=range] { -webkit-appearance:none; appearance:none; width:128px; height:4px; background: var(--border); border-radius:3px; outline:none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background: var(--accent); cursor:pointer; transition: transform .15s; }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.25); }
+
+    input[type=color] { -webkit-appearance:none; appearance:none; width:34px; height:20px; padding:0; border:1px solid var(--border); border-radius:5px; background:none; cursor:pointer; flex:none; }
+    input[type=color]::-webkit-color-swatch-wrapper { padding:2px; }
+    input[type=color]::-webkit-color-swatch { border:none; border-radius:3px; }
+    .ctrls { display:flex; align-items:center; gap:8px; }
+
+    /* custom animated dropdown */
+    .dd { position: relative; min-width: 130px; user-select: none; }
+    .dd-cur { display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--bg);
+      border:1px solid var(--border); border-radius:5px; padding:4px 8px; cursor:pointer; color:var(--text); transition:border-color .2s; }
+    .dd-cur:hover { border-color:var(--accent); }
+    .dd-cur::after { content:'▾'; color:var(--text-dim); font-size:10px; transition:transform .25s ease; }
+    .dd.open .dd-cur::after { transform:rotate(180deg); }
+    .dd-menu { position:fixed; background:var(--panel); border:1px solid var(--border);
+      border-radius:6px; overflow:hidden; z-index:40; box-shadow:0 10px 24px rgba(0,0,0,.45);
+      font:12px/1.5 'Consolas','Segoe UI',monospace; color:var(--text);
+      transform:scaleY(.8); transform-origin:top; opacity:0; pointer-events:none;
+      transition:transform .2s cubic-bezier(.22,1,.36,1), opacity .15s ease; }
+    .dd-menu.open { transform:scaleY(1); opacity:1; pointer-events:auto; }
+    .dd-opt { padding:5px 9px; cursor:pointer; transition:background .15s, color .15s; }
+    .dd-opt:hover { background:var(--border); }
+    .dd-opt.sel { color:var(--accent); }
+    .dd-multi { display:flex; align-items:center; gap:8px; }
+    .dd-check { width:12px; height:12px; border:1px solid var(--border); border-radius:3px; flex:none; transition:background .15s, border-color .15s; }
+    .dd-opt.on .dd-check { background:var(--accent); border-color:var(--accent); }
+
+    /* custom colour picker */
+    .cp-swatch { width:34px; height:20px; border-radius:5px; border:1px solid var(--border); cursor:pointer; flex:none; transition:border-color .2s;
+      background: repeating-conic-gradient(#888 0% 25%, #bbb 0% 50%) 50% / 8px 8px; }
+    .cp-swatch:hover { border-color:var(--accent); }
+    .cp-pop { position:fixed; width:184px; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:10px; z-index:40;
+      font:12px/1.5 'Consolas','Segoe UI',monospace; color:var(--text);
+      box-shadow:0 12px 30px rgba(0,0,0,.5); transform:scale(.92); opacity:0; pointer-events:none;
+      transition:transform .16s cubic-bezier(.22,1,.36,1), opacity .14s ease; }
+    .cp-pop.open { transform:scale(1); opacity:1; pointer-events:auto; }
+    .cp-sv { position:relative; width:100%; height:120px; border-radius:5px; cursor:crosshair; overflow:hidden; }
+    .cp-sv-inner { position:absolute; inset:0; background:linear-gradient(to top,#000,rgba(0,0,0,0)),linear-gradient(to right,#fff,rgba(255,255,255,0)); }
+    .cp-handle { position:absolute; width:12px; height:12px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.6); transform:translate(-50%,-50%); pointer-events:none; }
+    .cp-hue { position:relative; width:100%; height:12px; margin-top:10px; border-radius:6px; cursor:pointer;
+      background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
+    .cp-hue-handle, .cp-alpha-handle { position:absolute; top:50%; width:12px; height:12px; border-radius:50%; border:2px solid #fff; background:transparent; box-shadow:0 0 0 1px rgba(0,0,0,.6); transform:translate(-50%,-50%); pointer-events:none; }
+    .cp-alpha { position:relative; width:100%; height:12px; margin-top:12px; border-radius:6px; cursor:pointer; overflow:visible;
+      background: repeating-conic-gradient(#888 0% 25%, #bbb 0% 50%) 50% / 8px 8px; }
+    .cp-alpha-grad { position:absolute; inset:0; border-radius:6px; }
+    .cp-hexrow { margin-top:10px; }
+    .cp-hex { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:5px; padding:4px 6px; font:11px 'Consolas',monospace; outline:none; text-transform:uppercase; }
+    .cp-hex:focus { border-color:var(--accent); }
+
+    button.btn { background: var(--border); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:5px 10px; font:11px 'Consolas',monospace; cursor:pointer; transition: border-color .2s, background .2s; }
+    button.btn:hover { border-color: var(--accent); }
+    select, input[type=text] { background: var(--bg); color: var(--text); border:1px solid var(--border); border-radius:5px; padding:4px 6px; font:11px 'Consolas',monospace; outline:none; }
+
+    .sub { overflow:hidden; max-height: 600px; opacity:1; transition: max-height .38s ease, opacity .28s ease; }
+    .sub.collapsed { max-height:0; opacity:0; }
+
+    /* ---- player ESP overlay (2D box / name / health) ---- */
+    #esp { position: fixed; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
+    #hullcanvas { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+    .esp-box { position: absolute; border: 1.5px solid #fff; border-radius: 4px; box-sizing: border-box; transition: opacity .18s ease; will-change: transform; }
+    .esp-name { position: absolute; transform: translate(-50%, -100%); margin-top: -3px; white-space: nowrap;
+      font: 600 11px 'Consolas', monospace; text-shadow: 0 1px 2px rgba(0,0,0,0.9); transition: opacity .18s ease; }
+    .esp-health { position: absolute; width: 3px; border-radius: 2px; background: rgba(0,0,0,0.55); overflow: hidden; transition: opacity .18s ease; }
+    .esp-health > i { position: absolute; left: 0; right: 0; bottom: 0; transition: height .25s ease, background-color .25s ease; }
+    /* per-feature black outlines are applied inline (alpha-matched to each feature) */
+
+    /* hosted browser client: stream.lua control + disk-backed profiles are host-only */
+    body.remote #sec-stream, body.remote #sec-profiles { display: none; }
+  </style>
+</head>
+<body>
+  <canvas id="app"></canvas>
+  <canvas id="hullcanvas"></canvas>
+  <div id="esp"></div>
+
+  <div id="hud">
+    <div class="title">serotonin radar</div>
+    <div class="row"><span id="status-dot" class="dot off"></span><span id="status-text">connecting…</span></div>
+    <div class="row" id="info">parts: 0 · players: 0</div>
+    <div class="row" id="assets" style="display:none"></div>
+    <div class="row" id="mode">view: locked · <span class="key">F</span> freecam</div>
+  </div>
+
+  <div id="help">
+    <div id="help-lock"><b>locked</b> · scroll zoom · RMB orbit · <span class="key">C</span> re-centre · <span class="key">F</span> freecam</div>
+    <div id="help-free" style="display:none"><b>freecam</b> · RMB look · WASD move · scroll dolly · <span class="key">F</span> lock</div>
+  </div>
+
+  <div id="gear" title="Settings">⚙</div>
+  <div id="settings">
+    <h2>SETTINGS</h2>
+
+    <div class="section">
+      <div class="title">Visuals</div>
+      <div class="row"><label>Outlines</label><div id="set-outlines-dd"></div></div>
+      <div class="row"><label>Your colour</label><input type="color" id="set-localcol"></div>
+      <div class="row"><label>Team colours</label>
+        <label class="toggle"><input type="checkbox" id="set-team"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="row"><label>Show hidden</label>
+        <span class="ctrls"><input type="color" id="set-hidcol">
+          <label class="toggle"><input type="checkbox" id="set-hidden"><span class="track"><span class="knob"></span></span></label></span>
+      </div>
+      <div class="row"><label>Skeleton</label>
+        <span class="ctrls"><input type="color" id="set-skelcol">
+          <label class="toggle"><input type="checkbox" id="set-skel"><span class="track"><span class="knob"></span></span></label></span>
+      </div>
+      <div class="row"><label>Bounding box</label>
+        <span class="ctrls"><input type="color" id="set-boxcol">
+          <label class="toggle"><input type="checkbox" id="set-box"><span class="track"><span class="knob"></span></span></label></span>
+      </div>
+      <div class="sub" id="box-sub">
+        <div class="row"><label>Box fill</label>
+          <span class="ctrls"><input type="color" id="set-boxfillcol">
+            <label class="toggle"><input type="checkbox" id="set-boxfill"><span class="track"><span class="knob"></span></span></label></span>
+        </div>
+      </div>
+      <div class="row"><label>Chams</label>
+        <span class="ctrls"><input type="color" id="set-chamscol">
+          <label class="toggle"><input type="checkbox" id="set-chams"><span class="track"><span class="knob"></span></span></label></span>
+      </div>
+      <div class="sub" id="chams-sub">
+        <div class="row"><label>Style</label><div id="set-chamstyle-dd"></div></div>
+        <div class="row"><label>Chams fill</label>
+          <span class="ctrls"><input type="color" id="set-chamsfillcol">
+            <label class="toggle"><input type="checkbox" id="set-chamsfill"><span class="track"><span class="knob"></span></span></label></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="title">Player info</div>
+      <div class="row"><label>Names</label>
+        <span class="ctrls"><input type="color" id="set-namecol">
+          <label class="toggle"><input type="checkbox" id="set-names"><span class="track"><span class="knob"></span></span></label></span>
+      </div>
+      <div class="sub" id="names-sub">
+        <div class="row"><label>Name type</label><div id="set-namemode-dd"></div></div>
+        <div class="row"><label>Show your name</label>
+          <label class="toggle"><input type="checkbox" id="set-localname"><span class="track"><span class="knob"></span></span></label>
+        </div>
+      </div>
+      <div class="row"><label>Health bar</label>
+        <span class="ctrls"><input type="color" id="set-hphigh" title="full health"><input type="color" id="set-hplow" title="low health">
+          <label class="toggle"><input type="checkbox" id="set-hp"><span class="track"><span class="knob"></span></span></label></span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="title">Occlusion</div>
+      <div class="row"><label>Fade occluders</label>
+        <label class="toggle"><input type="checkbox" id="set-occ"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="sub" id="occ-sub">
+        <div class="row"><label>Strength</label><input type="range" id="set-occ-str" min="0" max="100"><span class="val" id="v-occ-str">96</span></div>
+        <div class="row"><label>Reach</label><input type="range" id="set-occ-reach" min="2" max="40"><span class="val" id="v-occ-reach">8</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="title">Camera</div>
+      <div class="row"><label>Follow distance</label><input type="range" id="set-dist" min="8" max="300"><span class="val" id="v-dist">40</span></div>
+      <div class="row"><label>Sensitivity</label><input type="range" id="set-sens" min="20" max="300"><span class="val" id="v-sens">1.0</span></div>
+      <div class="row"><label>Invert drag X</label>
+        <label class="toggle"><input type="checkbox" id="set-invx"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="row"><label>Invert drag Y</label>
+        <label class="toggle"><input type="checkbox" id="set-invy"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="row"><label>Locked smoothing</label>
+        <label class="toggle"><input type="checkbox" id="set-smooth"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="sub" id="smooth-sub">
+        <div class="row"><label>Smoothness</label><input type="range" id="set-smoothamt" min="0" max="100" step="1"><span class="val" id="v-smoothamt">60</span></div>
+      </div>
+      <div class="row"><label>Freecam speed</label><input type="range" id="set-fspeed" min="40" max="800" step="10"><span class="val" id="v-fspeed">220</span></div>
+      <div class="row"><label>Freecam drag smoothing</label>
+        <label class="toggle"><input type="checkbox" id="set-fdrag"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="sub" id="fdrag-sub">
+        <div class="row"><label>Smoothness</label><input type="range" id="set-fdragamt" min="0" max="100" step="1"><span class="val" id="v-fdragamt">50</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="title">Map view</div>
+      <div class="row"><label>Cull above player</label>
+        <label class="toggle"><input type="checkbox" id="set-hcull"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="sub" id="hcull-sub">
+        <div class="row"><label>Keep above (studs)</label><input type="range" id="set-hoff" min="0" max="120" step="1"><span class="val" id="v-hoff">20</span></div>
+      </div>
+      <div class="row"><label>Real meshes</label>
+        <label class="toggle"><input type="checkbox" id="set-meshes"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="sub" id="meshes-sub">
+        <div class="row"><label>Textures</label>
+          <label class="toggle"><input type="checkbox" id="set-textures"><span class="track"><span class="knob"></span></span></label>
+        </div>
+        <div class="row"><label>Hide failed meshes</label>
+          <label class="toggle"><input type="checkbox" id="set-hidefail"><span class="track"><span class="knob"></span></span></label>
+        </div>
+        <div class="row"><label>Vert limit</label>
+          <label class="toggle"><input type="checkbox" id="set-vlim"><span class="track"><span class="knob"></span></span></label>
+        </div>
+        <div class="sub" id="vlim-sub">
+          <div class="row"><label>Max verts</label><input type="range" id="set-vlimv" min="10000" max="1000000" step="10000"><span class="val" id="v-vlimv">200k</span></div>
+        </div>
+      </div>
+      <div class="row"><label>Materials</label>
+        <label class="toggle"><input type="checkbox" id="set-mats"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="row"><label>Hide unions</label>
+        <label class="toggle"><input type="checkbox" id="set-hideunions"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="row"><label>Part decals</label>
+        <label class="toggle"><input type="checkbox" id="set-decals"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="row"><label>Render distance</label><input type="range" id="set-rdist" min="200" max="8000" step="100"><span class="val" id="v-rdist">∞</span></div>
+      <div class="row"><label>LOD</label>
+        <label class="toggle"><input type="checkbox" id="set-lod"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="sub" id="lod-sub">
+        <div class="row"><label>LOD distance</label><input type="range" id="set-lodd" min="200" max="5000" step="100"><span class="val" id="v-lodd">1500</span></div>
+      </div>
+      <div class="row"><label>Transparency</label><div id="set-transp-dd"></div></div>
+    </div>
+
+    <div class="section" id="sec-stream">
+      <div class="title">Stream rates</div>
+      <div class="row"><label>Player rate</label><input type="range" id="set-phz" min="5" max="30" step="1"><span class="val"><span id="v-phz">15</span>hz</span></div>
+      <div class="row"><label>Auto map refresh</label>
+        <label class="toggle"><input type="checkbox" id="set-mauto"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="sub" id="mauto-sub">
+        <div class="row"><label>Refresh every</label><input type="range" id="set-mrs" min="1" max="30" step="1"><span class="val"><span id="v-mrs">4</span>s</span></div>
+      </div>
+      <div class="row"><label>Reload map now</label><button class="btn" id="set-mapnow">Reload</button></div>
+      <div class="row"><label>Map radius</label><input type="range" id="set-rad" min="250" max="5000" step="250"><span class="val" id="v-rad">2000</span></div>
+    </div>
+
+    <div class="section">
+      <div class="title">Theme</div>
+      <div class="row"><label>Background</label><input type="color" id="th-bg"></div>
+      <div class="row"><label>Panel</label><input type="color" id="th-panel"></div>
+      <div class="row"><label>Border</label><input type="color" id="th-border"></div>
+      <div class="row"><label>Text</label><input type="color" id="th-text"></div>
+      <div class="row"><label>Text dim</label><input type="color" id="th-text-dim"></div>
+      <div class="row"><label>Accent</label><input type="color" id="th-accent"></div>
+      <div class="row"><label>Status · live</label><input type="color" id="th-ok"></div>
+      <div class="row"><label>Status · loading</label><input type="color" id="th-warn"></div>
+      <div class="row"><label>Status · offline</label><input type="color" id="th-bad"></div>
+      <div class="row"><button class="btn" id="th-reset" style="flex:1">Reset theme</button></div>
+    </div>
+
+    <div class="section" id="sec-profiles">
+      <div class="title">Profiles</div>
+      <div class="row"><div id="pf-list-dd" style="flex:1"></div></div>
+      <div class="row" style="gap:6px">
+        <button class="btn" id="pf-save" style="flex:1">Save</button>
+        <button class="btn" id="pf-load" style="flex:1">Load</button>
+        <button class="btn" id="pf-del" style="flex:1">Delete</button>
+      </div>
+      <div class="row"><input type="text" id="pf-name" placeholder="new profile name…" style="flex:1"></div>
+      <div class="row" style="gap:6px">
+        <span class="val" id="pf-auto" style="flex:1;text-align:left;color:var(--text-dim)">auto-load: none</span>
+        <button class="btn" id="pf-setauto">Set</button>
+        <button class="btn" id="pf-clrauto">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Boot-error reporter (classic script, ES5-safe so it runs in ANY browser): if the module
+    // chain below dies before its first status update — old browser without import-map support,
+    // an extension blocking module scripts, a failed import — the page would sit on
+    // "connecting…" forever with the reason buried in devtools. Surface it on the status line
+    // instead. The /connecting/ guard means a successfully booted app is never clobbered.
+    (function () {
+      function report(msg) {
+        var t = document.getElementById('status-text');
+        if (t && /connecting/.test(t.textContent)) {
+          t.textContent = msg;
+          var d = document.getElementById('status-dot');
+          if (d) d.className = 'dot off';
+        }
+      }
+      window.addEventListener('error', function (e) {
+        var src = e.target && e.target.src;
+        report('boot error: ' + (e.message || (src ? 'failed to load ' + src : 'unknown — see console (F12)')));
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        report('boot error: ' + ((e.reason && e.reason.message) || e.reason || 'unknown — see console (F12)'));
+      });
+      window.addEventListener('DOMContentLoaded', function () {
+        if (typeof HTMLScriptElement === 'undefined' || typeof HTMLScriptElement.supports !== 'function'
+            || !HTMLScriptElement.supports('importmap')) {
+          report('browser too old: no import-map support — use a current Chrome, Edge, Firefox or Safari');
+        }
+      });
+    })();
+  </script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./node_modules/three/build/three.module.js",
+        "three/addons/": "./node_modules/three/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="./renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Mesh Inspector</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #101216; color: #cfd3da; font: 13px 'Consolas', monospace; overflow: hidden; }
+    #bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; gap: 8px; align-items: center;
+      padding: 8px 10px; background: rgba(16,18,22,.92); border-bottom: 1px solid #262a33;
+    }
+    #bar input[type=text] {
+      background: #181b21; color: #e6e9ee; border: 1px solid #2c313c; border-radius: 4px; padding: 5px 8px; width: 190px;
+    }
+    #bar button { background: #2a64c8; color: #fff; border: 0; border-radius: 4px; padding: 6px 14px; cursor: pointer; }
+    #bar button:hover { background: #3573dc; }
+    #bar label { display: flex; gap: 5px; align-items: center; cursor: pointer; user-select: none; }
+    #status { position: fixed; left: 10px; bottom: 10px; z-index: 10; white-space: pre; line-height: 1.5;
+      background: rgba(16,18,22,.85); border: 1px solid #262a33; border-radius: 6px; padding: 8px 12px; }
+    .err { color: #e06c75; }
+    .ok { color: #98c379; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <span>Mesh id</span><input type="text" id="mesh-id" placeholder="e.g. 117805356475599" spellcheck="false">
+    <span>Texture id</span><input type="text" id="tex-id" placeholder="optional" spellcheck="false">
+    <span>Place id</span><input type="text" id="place-id" placeholder="for game assets" spellcheck="false">
+    <button id="load">Load</button>
+    <label><input type="checkbox" id="wire"> wireframe</label>
+    <label><input type="checkbox" id="aspect" checked> true aspect</label>
+  </div>
+  <div id="status">enter an asset id and hit Load</div>
+
+  <script type="importmap">
+    { "imports": { "three": "./node_modules/three/build/three.module.js", "three/addons/": "./node_modules/three/examples/jsm/" } }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { fetchAssetBytes, parseRobloxMesh, decodeDraco, setAssetPlaceId } from './assetlib.js';
+
+    const fs = require('fs');
+    const path = require('path');
+    const MESH_CACHE_DIR = path.join(__dirname, 'mesh-cache');
+    const TEX_CACHE_DIR = path.join(__dirname, 'texture-cache');
+
+    // ---------- scene ----------
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x101216);
+    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.01, 1000);
+    camera.position.set(1.6, 1.2, 1.6);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x30281e, 1.1));
+    const dl = new THREE.DirectionalLight(0xffffff, 1.6);
+    dl.position.set(3, 5, 2);
+    scene.add(dl);
+    scene.add(new THREE.GridHelper(4, 16, 0x3a4150, 0x232833));
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+
+    // ---------- load ----------
+    const $ = (id) => document.getElementById(id);
+    const status = $('status');
+    let current = null;   // {mesh, geom, mat}
+    const say = (txt, cls) => { status.textContent = txt; status.className = cls || ''; console.log('STATUS | ' + txt.replace(/\n/g, ' | ')); };
+
+    function clearCurrent() {
+      if (!current) return;
+      scene.remove(current.mesh);
+      current.geom.dispose();
+      current.mat.dispose();
+      if (current.mat.map) current.mat.map.dispose();
+      current = null;
+    }
+
+    async function getBytes(id, dir, ext) {
+      // same disk-cache-then-network behaviour as the radar
+      try { return { buf: fs.readFileSync(path.join(dir, id + ext)), src: 'disk cache' }; } catch { /* miss */ }
+      return { buf: await fetchAssetBytes(id, dir, ext), src: 'network (now cached)' };
+    }
+
+    async function load() {
+      const id = $('mesh-id').value.trim().replace(/\D/g, '');
+      const texId = $('tex-id').value.trim().replace(/\D/g, '');
+      setAssetPlaceId($('place-id').value.trim().replace(/\D/g, '') || null);   // game assets need place context
+      if (!id) { say('enter a numeric mesh id', 'err'); return; }
+      say('fetching ' + id + ' ...');
+      try {
+        const { buf, src } = await getBytes(id, MESH_CACHE_DIR, '.mesh');
+        const verStr = buf.toString('ascii', 0, 12).trim();
+        const parsed = parseRobloxMesh(buf);
+        let geom, how;
+        if (parsed.draco) {
+          say(verStr + ' — draco decoding ...');
+          geom = await decodeDraco(parsed.draco);
+          how = 'DRACO (async WASM)';
+        } else {
+          geom = parsed;
+          how = 'inline';
+        }
+        const uvA = geom.getAttribute('uv');
+        let uvIn = 0;
+        if (uvA) for (let i = 0; i < uvA.array.length; i++) if (uvA.array[i] >= -0.01 && uvA.array[i] <= 1.01) uvIn++;
+        const tris = geom.index ? geom.index.count / 3 : geom.getAttribute('position').count / 3;
+
+        let tex = null, texLine = '';
+        if (texId) {
+          try {
+            const t = await getBytes(texId, TEX_CACHE_DIR, '.img');
+            const bmp = await createImageBitmap(new Blob([t.buf]));
+            tex = new THREE.Texture(bmp);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.flipY = false;
+            tex.needsUpdate = true;
+            texLine = `\ntexture  : ${texId} ${bmp.width}x${bmp.height} (${t.src})`;
+          } catch (err) { texLine = `\ntexture  : FAILED — ${err.message}`; }
+        }
+
+        clearCurrent();
+        const mat = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, color: tex ? 0xffffff : 0x8fa3c8, map: tex, wireframe: $('wire').checked });
+        const mesh = new THREE.Mesh(geom, mat);
+        const sz = geom.userData.size || [1, 1, 1];
+        const apply = () => {
+          if ($('aspect').checked) {
+            const m = Math.max(sz[0], sz[1], sz[2]);
+            mesh.scale.set(sz[0] / m, sz[1] / m, sz[2] / m);   // true shape, fit in ~1 unit
+          } else mesh.scale.set(1, 1, 1);                       // raw normalized unit box
+        };
+        apply();
+        $('aspect').onchange = apply;
+        scene.add(mesh);
+        current = { mesh, geom, mat };
+        say(
+          `mesh     : ${id} (${src})\n` +
+          `format   : ${verStr} — ${how}\n` +
+          `geometry : ${geom.getAttribute('position').count} verts, ${tris} tris\n` +
+          `uv       : ${uvA ? (100 * uvIn / uvA.array.length).toFixed(0) + '% in [0,1]' : 'none'}\n` +
+          `size     : ${sz.map((v) => v.toFixed(2)).join(' x ')} (mesh-local units)` + texLine,
+          'ok');
+      } catch (err) {
+        say('FAILED: ' + err.message, 'err');
+      }
+    }
+
+    $('load').addEventListener('click', load);
+    $('mesh-id').addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+    $('tex-id').addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+    $('wire').addEventListener('change', () => { if (current) current.mat.wireframe = $('wire').checked; });
+
+    // id passed on the command line -> load immediately
+    const argId = (process.argv.find((a) => a.startsWith('--mesh-id=')) || '').split('=')[1];
+    const argTex = (process.argv.find((a) => a.startsWith('--tex-id=')) || '').split('=')[1];
+    const argPlace = (process.argv.find((a) => a.startsWith('--place-id=')) || '').split('=')[1];
+    if (argPlace) $('place-id').value = argPlace;
+    if (argId) { $('mesh-id').value = argId; if (argTex) $('tex-id').value = argTex; load(); }
+  </script>
+</body>
+</html>
