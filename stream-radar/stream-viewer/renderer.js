@@ -470,31 +470,59 @@ const ASSET_CONCURRENCY = 6;
 const assetQueue = [];
 let assetActive = 0;
 
-// progress counters for the HUD: total ever enqueued this session vs finished (success or fail)
-let assetTotal = 0;
-let assetDone = 0;
+// progress HUD: per-kind requested-id sets vs the entries' live states ("decals 3/9 · ..." per
+// kind). Map kinds rebuild on every map build (so toggling a feature off drops its row) and
+// player meshes accumulate per place. Counting reads entry states directly, so disk-cache hits
+// and queue-skipping requests are counted too — the old enqueue-side counter missed them, which
+// is why a fully cached map never showed anything.
+const assetWant = { meshes: new Set(), textures: new Set(), decals: new Set(), materials: new Set(), players: new Set() };
 const assetsRow = document.getElementById('assets');
 let assetHideTimer = null;
+let assetDoneShown = false;   // hide-once: stay hidden after the "ready" linger until states change
 function renderAssetProgress() {
   if (!assetsRow) return;
-  if (assetTotal === 0) { assetsRow.style.display = 'none'; return; }
+  const KINDS = [
+    ['meshes', assetWant.meshes, meshGeo],
+    ['players', assetWant.players, meshGeo],
+    ['textures', assetWant.textures, texMap],
+    ['decals', assetWant.decals, texMap],
+    ['materials', assetWant.materials, texMap],
+  ];
+  const parts = [];
+  let total = 0, done = 0, failed = 0;
+  for (const [label, want, store] of KINDS) {
+    if (!want.size) continue;
+    let d = 0, f = 0;
+    for (const id of want) {
+      const e = store.get(id);
+      if (!e) continue;
+      if (e.state === 'ready') d++;
+      else if (e.state === 'failed') { d++; f++; }
+    }
+    total += want.size; done += d; failed += f;
+    parts.push(`${label} ${d}/${want.size}`);
+  }
+  if (total === 0) { assetsRow.style.display = 'none'; return; }
+  const fin = done >= total;
+  if (fin && assetDoneShown) { assetsRow.style.display = 'none'; return; }
   assetsRow.style.display = '';
-  const done = assetDone >= assetTotal;
-  assetsRow.textContent = done ? `assets ready: ${assetTotal}` : `loading assets: ${assetDone}/${assetTotal}`;
-  // 6-wide fetching can finish a small map in under a second; linger on the final count so the
-  // indicator is actually seen, then hide and reset for the next burst.
+  assetsRow.textContent = (fin ? `assets ready: ${total}` : parts.join(' · '))
+    + (failed ? ` · ${failed} failed` : '');
+  // a small map can finish in under a second; linger on the final count so it's actually
+  // seen, then hide until something new starts loading
   clearTimeout(assetHideTimer);
-  if (done) assetHideTimer = setTimeout(() => {
-    assetsRow.style.display = 'none';
-    assetTotal = 0; assetDone = 0;
-  }, 1500);
+  if (fin) {
+    assetHideTimer = setTimeout(() => { assetDoneShown = true; assetsRow.style.display = 'none'; }, 1500);
+  } else {
+    assetDoneShown = false;
+    assetHideTimer = null;
+  }
 }
 
 function enqueueAsset(job, front) {
   // front-of-queue is for player limb/accessory meshes: a first map sight enqueues hundreds of
   // map assets, and mesh-hull chams shouldn't wait behind all of them to stop drawing boxes
   if (front) assetQueue.unshift(job); else assetQueue.push(job);
-  assetTotal++;
   renderAssetProgress();
   pumpAssetQueue();
 }
@@ -509,7 +537,6 @@ function pumpAssetQueue() {
       const b = getBackoff();
       if (b > 0) await new Promise((r) => setTimeout(r, b));
       assetActive--;
-      assetDone++;
       renderAssetProgress();
       pumpAssetQueue();
     })();
@@ -532,11 +559,13 @@ function applyParsedMesh(e, id, parsed) {
         e.state = 'ready';
         if (DIAG) console.log(`DIAG mesh ${id} draco decoded: ${geom.getAttribute('position').count} verts`);
         meshArrived();
+        renderAssetProgress();
       })
       .catch((err) => {
         e.state = 'failed';
         if (settings.hideFailedMeshes) meshArrived();   // rebuild to drop the box placeholder
         if (DIAG) console.log(`DIAG mesh ${id} draco failed: ${err.message}`);
+        renderAssetProgress();
       });
     return false;
   }
@@ -601,8 +630,13 @@ function requestTexture(id) {
       e.tex = t;
       e.state = 'ready';
       meshArrived();
+      renderAssetProgress();
     })
-    .catch((err) => { e.state = 'failed'; if (DIAG) console.log(`DIAG texture ${id} decode failed: ${err.message}`); });
+    .catch((err) => {
+      e.state = 'failed';
+      if (DIAG) console.log(`DIAG texture ${id} decode failed: ${err.message}`);
+      renderAssetProgress();
+    });
   if (!IS_REMOTE) {
     try { finish(fs.readFileSync(file)); return e; }   // disk hit -> decode async, no network
     catch { /* not cached */ }
@@ -838,12 +872,13 @@ function buildMap(map) {
   // Pre-warm: kick off every unique mesh AND texture fetch up front (request* dedupe internally) so
   // they download in one parallel burst. Otherwise textures only start after their mesh is ready and
   // the group below requests them — a second serial wave that doubles the time to a fully dressed map.
+  assetWant.meshes.clear(); assetWant.textures.clear(); assetWant.decals.clear(); assetWant.materials.clear();
   if (settings.meshes || settings.partDecals || settings.materials) {
     for (const pt of parts) {
-      if (settings.meshes && pt.m) requestMesh(pt.m);
-      if (settings.meshes && settings.textures && pt.tx) requestTexture(pt.tx);
-      if (settings.partDecals && pt.dc) for (const d of pt.dc) requestTexture(d[1]);
-      if (settings.materials && pt.mt && MAT_TEX[pt.mt]) requestTexture(MAT_TEX[pt.mt]);
+      if (settings.meshes && pt.m) { assetWant.meshes.add(pt.m); requestMesh(pt.m); }
+      if (settings.meshes && settings.textures && pt.tx) { assetWant.textures.add(pt.tx); requestTexture(pt.tx); }
+      if (settings.partDecals && pt.dc) for (const d of pt.dc) { assetWant.decals.add(d[1]); requestTexture(d[1]); }
+      if (settings.materials && pt.mt && MAT_TEX[pt.mt]) { assetWant.materials.add(MAT_TEX[pt.mt]); requestTexture(MAT_TEX[pt.mt]); }
     }
   }
 
@@ -1165,6 +1200,7 @@ function buildMap(map) {
     mapChunks.push({ mesh, twin, fade, centers, halfExt, count: list.length, shared });
   }
   occSig = '';   // force the occlusion pass to re-run against the fresh alpha arrays
+  renderAssetProgress();   // counts disk-cache hits that never touch the queue
   if (DIAG) console.log(`DIAG map: ${parts.length} parts in ${mapChunks.length} chunk(s)`
     + (hiddenFailed ? ` (${hiddenFailed} failed-mesh parts hidden)` : '')
     + (hiddenUnions ? ` (${hiddenUnions} unions hidden)` : ''));
@@ -1324,6 +1360,7 @@ function meshHullPts(id) {
   let p = limbPtsCache.get(id);
   if (p !== undefined) return p;
   const e = requestMesh(id, true);   // front-of-queue: don't wait behind a map-mesh burst
+  assetWant.players.add(id);
   // NEVER cache a miss. 'loading' resolves on a later build tick, and a 'failed' entry must keep
   // re-entering requestMesh, which retries rate-limited ids once their cooldown lapses (one 429
   // during a map burst insta-fails every mesh requested for the next 30 min). Caching null here
@@ -1456,6 +1493,8 @@ function clearMap() {
   lastMapData = null;
   lastMapStr = '';
   partCount = 0;
+  assetWant.meshes.clear(); assetWant.textures.clear(); assetWant.decals.clear(); assetWant.materials.clear();
+  renderAssetProgress();
 }
 
 function clearPlayers() {
@@ -1465,6 +1504,8 @@ function clearPlayers() {
   haveLocal = false;
   localFace = null;
   playerCount = 0;
+  assetWant.players.clear();
+  renderAssetProgress();
 }
 
 function buildPlayers(data) {

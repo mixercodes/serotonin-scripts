@@ -315,6 +315,111 @@ local function scan_cm_body(CMH, lo, hi)
     return nil
 end
 
+-- ---- per-family derivations ----
+-- Each pins one class family's offsets from live sample addresses (idempotent — no-ops once
+-- resolved). Called from resolve_offsets' bounded walk AND from the scan-fed sample pools
+-- below: the walk is budget-capped and can finish all its attempts on a big/streaming-in map
+-- without ever seeing a Decal or SpecialMesh, locking the family out for the whole place even
+-- though the map scan touches those exact instances every rescan.
+
+local function derive_dc(DCTX)
+    if OFF_GOT.dc or #DCTX < 2 then return end
+    local anchor = scan_asset(DCTX, 360, 440)
+    if not anchor then return end
+    OFF.dc_tex = anchor
+    local face = nil
+    if ok_enum(DCTX, anchor + D.dc_face, 5) then face = anchor + D.dc_face
+    else face = scan_enum(DCTX, anchor - 224, anchor - 128, 5) end
+    if not face then return end
+    OFF.dc_face, OFF_GOT.dc = face, true
+    -- Transparency: ok_unit_float alone is weak — a junk field constant at ~1.0 passes it, and
+    -- the emit guard then drops EVERY decal as "fully transparent". Demand at least one sample
+    -- reading near-opaque (the true field is 0.0 on normal decals); otherwise stream opaque.
+    if ok_unit_float(DCTX, anchor + D.dc_tr) then
+        local low = 0
+        for _, a in ipairs(DCTX) do
+            local v = rd_num("float", a + anchor + D.dc_tr)
+            if v and v < 0.5 then low = low + 1 end
+        end
+        if low >= 1 then OFF.dc_tr, OFF_GOT.dc_tr = anchor + D.dc_tr, true end
+    end
+end
+
+-- Texture tiling: needs actual Texture samples (Decals share the struct but have no tiling
+-- floats -- pooled validation could never pass on a mixed sample). The layout hypothesis
+-- accepts a single sample; the window rescue needs at least two.
+local function derive_tx(TX)
+    if OFF_GOT.tx or not OFF.dc_tex or #TX < 1 then return end
+    if ok_tile(TX, OFF.dc_tex + D.tx_u) then
+        OFF.tx_tileu, OFF.tx_tilev, OFF_GOT.tx = OFF.dc_tex + D.tx_u, OFF.dc_tex + D.tx_v, true
+    elseif #TX >= 2 then
+        for off = OFF.dc_tex + 196, OFF.dc_tex + 256, 4 do
+            if ok_tile(TX, off) then
+                OFF.tx_tileu, OFF.tx_tilev, OFF_GOT.tx = off, off + 4, true
+                break
+            end
+        end
+    end
+end
+
+-- DataModelMesh (SpecialMesh/CylinderMesh/BlockMesh): the adjacent Offset/Scale vec3 pair
+-- anchors the base class -- no asset string needed, so geometric-mesh-only maps (where
+-- SpecialMeshes matter most: spheres, heads, skydomes) still resolve. SpecialMesh-only fields
+-- hang off the Scale anchor: MeshType (enum byte), MeshId and TextureId (asset strings;
+-- unresolved on maps with no FileMesh -- nothing to stream).
+local function derive_sm(DMM, SM)
+    if not OFF_GOT.sm then
+        local pair = scan_dmm_pair(DMM)
+        if pair then
+            OFF.sm_off, OFF.sm_scale = pair, pair + 12
+            OFF_GOT.sm, OFF_GOT.sm_off = true, true
+        end
+    end
+    if OFF_GOT.sm and #SM >= 2 then
+        local scale = OFF.sm_scale
+        if not OFF.sm_type and ok_enum(SM, scale + D.sm_type, 11, "byte") then
+            OFF.sm_type = scale + D.sm_type
+        end
+        if not OFF_GOT.sm_str and ok_asset_str(SM, scale + D.sm_str) then
+            OFF.sm_mesh, OFF_GOT.sm_str = scale + D.sm_str, true
+        end
+        if not OFF_GOT.sm_str then
+            -- rescue: pin MeshId by argmax string scan (works when FileMesh samples exist)
+            local mesh = scan_asset(SM, 240, 300, 3)
+            if mesh then OFF.sm_mesh, OFF_GOT.sm_str = mesh, true end
+        end
+        if OFF_GOT.sm_str and not OFF_GOT.sm_tex then
+            if ok_asset_str(SM, scale + D.sm_tex) then
+                OFF.sm_tex, OFF_GOT.sm_tex = scale + D.sm_tex, true
+            else
+                local stex = scan_asset(SM, OFF.sm_mesh + 16, OFF.sm_mesh + 80, 1)
+                if stex and stex ~= OFF.sm_mesh then OFF.sm_tex, OFF_GOT.sm_tex = stex, true end
+            end
+        end
+    end
+end
+
+-- SurfaceAppearance ColorMap (asset string)
+local function derive_sa(SA)
+    if OFF_GOT.sa or #SA < 2 then return end
+    local cm = scan_asset(SA, 192, 264)
+    if cm then OFF.sa_color, OFF_GOT.sa = cm, true end
+end
+
+-- CharacterMesh (packaged R6 limbs): MeshId content string anchors the class; BodyPart is the
+-- layout hypothesis validated by the permutation signature, window-rescued.
+local function derive_cm(CMH)
+    if OFF_GOT.cm or #CMH < 4 then return end
+    local flat = {}
+    for i = 1, #CMH do flat[i] = CMH[i].a end
+    local anchor = scan_asset(flat, 240, 300)
+    if anchor then
+        local body = scan_cm_body(CMH, anchor + D.cm_body, anchor + D.cm_body)
+            or scan_cm_body(CMH, anchor + 16, anchor + 160)
+        if body then OFF.cm_mesh, OFF.cm_body, OFF_GOT.cm = anchor, body, true end
+    end
+end
+
 -- Resolve every offset from live instances. A bounded workspace walk samples each class
 -- (stride-sampled so one cloned model can't dominate), each class is pinned by its anchor
 -- signature, and the remaining fields are layout hypotheses validated against the samples with
@@ -440,93 +545,11 @@ local function resolve_offsets(attempt)
             end
         end
 
-        -- Decal/Texture: ColorMapContent (asset string) anchors the class; Face and Transparency
-        -- are layout hypotheses validated on the live samples (Face gets a window rescue; the
-        -- Transparency window is hopeless -- on an all-opaque map every zero float qualifies).
-        if not OFF_GOT.dc and #DCTX >= 2 then
-            local anchor = scan_asset(DCTX, 360, 440)
-            if anchor then
-                OFF.dc_tex = anchor
-                local face = nil
-                if ok_enum(DCTX, anchor + D.dc_face, 5) then face = anchor + D.dc_face
-                else face = scan_enum(DCTX, anchor - 224, anchor - 128, 5) end
-                if face then
-                    OFF.dc_face, OFF_GOT.dc = face, true
-                    if ok_unit_float(DCTX, anchor + D.dc_tr) then
-                        OFF.dc_tr, OFF_GOT.dc_tr = anchor + D.dc_tr, true
-                    end
-                end
-            end
-        end
-        -- Texture tiling: needs actual Texture samples (Decals share the struct but have no
-        -- tiling floats -- pooled validation could never pass on a mixed sample). The layout
-        -- hypothesis accepts a single sample; the window rescue needs at least two.
-        if not OFF_GOT.tx and OFF.dc_tex and #TX >= 1 then
-            if ok_tile(TX, OFF.dc_tex + D.tx_u) then
-                OFF.tx_tileu, OFF.tx_tilev, OFF_GOT.tx = OFF.dc_tex + D.tx_u, OFF.dc_tex + D.tx_v, true
-            elseif #TX >= 2 then
-                for off = OFF.dc_tex + 196, OFF.dc_tex + 256, 4 do
-                    if ok_tile(TX, off) then
-                        OFF.tx_tileu, OFF.tx_tilev, OFF_GOT.tx = off, off + 4, true
-                        break
-                    end
-                end
-            end
-        end
-
-        -- DataModelMesh (SpecialMesh/CylinderMesh/BlockMesh): the adjacent Offset/Scale vec3
-        -- pair anchors the base class -- no asset string needed, so geometric-mesh-only maps
-        -- (where SpecialMeshes matter most: spheres, heads, skydomes) still resolve.
-        if not OFF_GOT.sm then
-            local pair = scan_dmm_pair(DMM)
-            if pair then
-                OFF.sm_off, OFF.sm_scale = pair, pair + 12
-                OFF_GOT.sm, OFF_GOT.sm_off = true, true
-            end
-        end
-        -- SpecialMesh-only fields hang off the Scale anchor: MeshType (enum byte), MeshId and
-        -- TextureId (asset strings; unresolved on maps with no FileMesh -- nothing to stream).
-        if OFF_GOT.sm and #SM >= 2 then
-            local scale = OFF.sm_scale
-            if not OFF.sm_type and ok_enum(SM, scale + D.sm_type, 11, "byte") then
-                OFF.sm_type = scale + D.sm_type
-            end
-            if not OFF_GOT.sm_str and ok_asset_str(SM, scale + D.sm_str) then
-                OFF.sm_mesh, OFF_GOT.sm_str = scale + D.sm_str, true
-            end
-            if not OFF_GOT.sm_str then
-                -- rescue: pin MeshId by argmax string scan (works when FileMesh samples exist)
-                local mesh = scan_asset(SM, 240, 300, 3)
-                if mesh then OFF.sm_mesh, OFF_GOT.sm_str = mesh, true end
-            end
-            if OFF_GOT.sm_str and not OFF_GOT.sm_tex then
-                if ok_asset_str(SM, scale + D.sm_tex) then
-                    OFF.sm_tex, OFF_GOT.sm_tex = scale + D.sm_tex, true
-                else
-                    local stex = scan_asset(SM, OFF.sm_mesh + 16, OFF.sm_mesh + 80, 1)
-                    if stex and stex ~= OFF.sm_mesh then OFF.sm_tex, OFF_GOT.sm_tex = stex, true end
-                end
-            end
-        end
-
-        -- SurfaceAppearance ColorMap (asset string)
-        if not OFF_GOT.sa and #SA >= 2 then
-            local cm = scan_asset(SA, 192, 264)
-            if cm then OFF.sa_color, OFF_GOT.sa = cm, true end
-        end
-
-        -- CharacterMesh (packaged R6 limbs): MeshId content string anchors the class; BodyPart
-        -- is the layout hypothesis validated by the permutation signature, window-rescued.
-        if not OFF_GOT.cm and #CMH >= 4 then
-            local flat = {}
-            for i = 1, #CMH do flat[i] = CMH[i].a end
-            local anchor = scan_asset(flat, 240, 300)
-            if anchor then
-                local body = scan_cm_body(CMH, anchor + D.cm_body, anchor + D.cm_body)
-                    or scan_cm_body(CMH, anchor + 16, anchor + 160)
-                if body then OFF.cm_mesh, OFF.cm_body, OFF_GOT.cm = anchor, body, true end
-            end
-        end
+        derive_dc(DCTX)
+        derive_tx(TX)
+        derive_sm(DMM, SM)
+        derive_sa(SA)
+        derive_cm(CMH)
     end)
 end
 
@@ -577,6 +600,95 @@ local force_scan = false  -- set by the viewer's "load map now" button (one-shot
 -- menu pause throttling the callbacks). No memory reads or new scans until the place settles.
 local place_changed_at = 0
 local function mem_safe() return utility.GetTickCount() - place_changed_at > 3000 end
+
+-- ===== scan-fed sample pools (starvation rescue for the offset resolver) =====
+-- resolve_offsets' walk is budget-capped and only runs in a place's first seconds; on a big or
+-- still-streaming map it can spend every attempt without sampling a single Decal/SpecialMesh/
+-- SurfaceAppearance, and that family then silently streams nothing for the whole place (root
+-- cause of "decals never load in this game"). The map scan walks the ENTIRE workspace every
+-- rescan and the player path touches every avatar — so while a family is unresolved, pool the
+-- class instances they pass anyway and re-run just that family's derivation. Bounded per
+-- family; one table lookup per scanned node once everything is resolved.
+local POOL_CAP       = 14
+local POOL_TRIES_MAX = 6
+local pools      = { dc = {}, tx = {}, sm = {}, dmm = {}, sa = {}, cmh = {} }
+local pool_seen  = {}   -- instance Address -> true (dedup; addresses recycle only across places)
+local pool_tries = { dc = 0, sm = 0, sa = 0, cm = 0 }
+local pool_dirty = false
+
+local POOL_CLASS = {
+    Decal = "dc", Texture = "tx", SpecialMesh = "sm",
+    CylinderMesh = "dmm", BlockMesh = "dmm", SurfaceAppearance = "sa",
+}
+
+local function pool_add(fam, addr)
+    if type(addr) ~= "number" or addr == 0 or pool_seen[addr] then return end
+    local t = pools[fam]
+    if #t >= POOL_CAP then return end
+    pool_seen[addr] = true
+    t[#t + 1] = addr
+    pool_dirty = true
+end
+
+-- scan-side gate: keep pooling while any scan-visible family still has samples + tries left
+local function pool_wanted()
+    if (not OFF_GOT.dc and pool_tries.dc < POOL_TRIES_MAX) or not OFF_GOT.tx then return true end
+    if (not OFF_GOT.sm or not OFF_GOT.sm_str or not OFF_GOT.sm_tex) and pool_tries.sm < POOL_TRIES_MAX then return true end
+    if not OFF_GOT.sa and pool_tries.sa < POOL_TRIES_MAX then return true end
+    return false
+end
+local function pool_sm_wanted()
+    return (not OFF_GOT.sm or not OFF_GOT.sm_str) and pool_tries.sm < POOL_TRIES_MAX
+end
+
+local function pool_reset()
+    pools      = { dc = {}, tx = {}, sm = {}, dmm = {}, sa = {}, cmh = {} }
+    pool_seen  = {}
+    pool_tries = { dc = 0, sm = 0, sa = 0, cm = 0 }
+    pool_dirty = false
+end
+
+-- Re-derive starved families from the pools. Dirty-gated (runs only when a pool actually grew)
+-- and tries-capped, so a family whose offsets genuinely can't pin stops costing anything.
+local function pool_derive()
+    if not pool_dirty or not mem_safe() then return end
+    pool_dirty = false
+    local before = (OFF_GOT.dc and 1 or 0) + (OFF_GOT.tx and 1 or 0) + (OFF_GOT.sm and 1 or 0)
+        + (OFF_GOT.sm_str and 1 or 0) + (OFF_GOT.sa and 1 or 0) + (OFF_GOT.cm and 1 or 0)
+    pcall(function()
+        if not OFF_GOT.dc and pool_tries.dc < POOL_TRIES_MAX then
+            local DCTX = {}
+            for _, a in ipairs(pools.dc) do DCTX[#DCTX + 1] = a end
+            for _, a in ipairs(pools.tx) do DCTX[#DCTX + 1] = a end
+            if #DCTX >= 2 then
+                pool_tries.dc = pool_tries.dc + 1
+                derive_dc(DCTX)
+            end
+        end
+        if OFF_GOT.dc and not OFF_GOT.tx then derive_tx(pools.tx) end
+        if (not OFF_GOT.sm or not OFF_GOT.sm_str or not OFF_GOT.sm_tex) and pool_tries.sm < POOL_TRIES_MAX then
+            local DMM = {}
+            for _, a in ipairs(pools.sm) do DMM[#DMM + 1] = a end
+            for _, a in ipairs(pools.dmm) do DMM[#DMM + 1] = a end
+            if #DMM >= 2 then
+                pool_tries.sm = pool_tries.sm + 1
+                derive_sm(DMM, pools.sm)
+            end
+        end
+        if not OFF_GOT.sa and #pools.sa >= 2 and pool_tries.sa < POOL_TRIES_MAX then
+            pool_tries.sa = pool_tries.sa + 1
+            derive_sa(pools.sa)
+        end
+        if not OFF_GOT.cm and #pools.cmh >= 4 and pool_tries.cm < POOL_TRIES_MAX then
+            pool_tries.cm = pool_tries.cm + 1
+            derive_cm(pools.cmh)
+        end
+    end)
+    local after = (OFF_GOT.dc and 1 or 0) + (OFF_GOT.tx and 1 or 0) + (OFF_GOT.sm and 1 or 0)
+        + (OFF_GOT.sm_str and 1 or 0) + (OFF_GOT.sa and 1 or 0) + (OFF_GOT.cm and 1 or 0)
+    -- a family just came online: refresh the map right away instead of waiting out the rescan
+    if after > before then force_scan = true end
+end
 
 -- ===== helpers =====
 local function now_ts() return utility.GetTimestamp() end
@@ -946,11 +1058,15 @@ end
 local function step_scan()
     local stack = scan.stack
     local processed = 0
+    local pool_on = pool_wanted()   -- once per chunk; zero per-node cost when all resolved
     while #stack > 0 and processed < SCAN_BUDGET do
         local node = stack[#stack]
         stack[#stack] = nil
         processed = processed + 1
         local cls = node.ClassName
+        -- starved offset families: pool this instance as a derivation sample (the node is
+        -- already popped and its ClassName read — this is free coverage of the whole place)
+        if pool_on and POOL_CLASS[cls] then pool_add(POOL_CLASS[cls], node.Address) end
         -- one GetChildren serves the character check, the traversal, AND emit_part's
         -- decal/mesh child scan (a separate is_character() doubled the calls on every Model)
         local kids = node:GetChildren()
@@ -971,6 +1087,7 @@ local function step_scan()
         last_scan_done = utility.GetTickCount()
         scan = nil
         write_meta("ready", true)
+        pool_derive()   -- families the resolver's walk starved: derive from what this scan saw
     end
 end
 
@@ -1071,7 +1188,21 @@ local function pb_mesh_suffix(part)
     if not mem_safe() then return "" end   -- teleport grace: no reads, no caching
     local suffix = ""
     -- needs both the Scale anchor and the MeshId string offset (FileMesh handles only)
-    if not (OFF_GOT.sm and OFF_GOT.sm_str) then return "" end
+    if not (OFF_GOT.sm and OFF_GOT.sm_str) then
+        -- starved sm family: avatars carry SpecialMeshes (hats, R6 heads) even on maps that
+        -- have none — pool this part's mesh child as a derivation sample (once per part)
+        if pool_sm_wanted() and not pool_seen[addr] then
+            pool_seen[addr] = true
+            pcall(function()
+                for _, ch in ipairs(part:GetChildren()) do
+                    local c = ch.ClassName
+                    if c == "SpecialMesh" then pool_add("sm", ch.Address); return
+                    elseif c == "CylinderMesh" or c == "BlockMesh" then pool_add("dmm", ch.Address); return end
+                end
+            end)
+        end
+        return ""
+    end
     pcall(function()
         for _, ch in ipairs(part:GetChildren()) do
             if ch.ClassName == "SpecialMesh" then
@@ -1205,6 +1336,15 @@ local function player_json(p, is_local)
                         end
                     else
                         saw_cm = true
+                        -- pool the sighting: derive_cm can then pin the family from real
+                        -- packaged limbs instead of hoping a re-armed walk finds them
+                        local a = ch.Address
+                        if type(a) == "number" and a ~= 0 and not pool_seen[a] and #pools.cmh < POOL_CAP then
+                            local pa = char.Address
+                            pool_seen[a] = true
+                            pools.cmh[#pools.cmh + 1] = { a = a, par = (type(pa) == "number") and pa or 0 }
+                            pool_dirty = true
+                        end
                     end
                 elseif ccls == "Accessory" and na < 10 then
                     local handle = ch:FindFirstChild("Handle")
@@ -1280,6 +1420,7 @@ local function clear_game_state(pid)
     pb_mesh_cache = {}
     cm_mesh_cache = {}
     mat_cache = {}
+    pool_reset()   -- pools/pool_seen are address-keyed too
     force_scan = false
     char_root = nil
     char_scan_at = 0
@@ -1316,6 +1457,7 @@ cheat.register("onUpdate", function()
     if now - last_pwrite < PLAYER_INTERVAL then return end
     last_pwrite = now
     write_players()
+    pool_derive()   -- dirty-gated no-op unless avatar pooling just added samples
 end)
 
 cheat.register("onSlowUpdate", function()
